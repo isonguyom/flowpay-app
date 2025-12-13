@@ -1,0 +1,14 @@
+@theme {
+  /* ===================================
+     BASE COLORS
+  =================================== */
+  --color-brand:        #0FB5BA; /* Primary red */
+  --color-light:        #FAFAFA; /* Light base */
+  --color-dark:         #1A1A1A; /* Dark base */
+  --color-neutral:      #767676; /* Mid neutral for both themes */
+
+  /* ===================================
+     TYPOGRAPHY
+  =================================== */
+  --font-body: "Inter", sans-serif;
+}

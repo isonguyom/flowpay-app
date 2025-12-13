@@ -1,0 +1,49 @@
+:root {
+  --bg-color: var(--color-light);
+  --text-color: var(--color-dark);
+}
+
+.dark {
+  --bg-color: var(--color-dark);
+  --text-color: var(--color-light);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+
+body {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg-color);
+  color: var(--text-color);
+  transition: color 0.3s, background-color 0.3s;
+  font-family: var(--font-body);
+  font-size: 16px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: teal transparent;
+  scroll-behavior: smooth;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-neutral);
+  border-radius: 4px;
+}
