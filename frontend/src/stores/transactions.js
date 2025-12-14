@@ -17,9 +17,10 @@ export const useTransactionStore = defineStore('transactions', () => {
         transactions.value = [
             {
                 id: 1,
+                ref: 'x00075hgksd',
                 from: 'USD',
                 to: 'NGN',
-                beneficiary: 'Martin Isonguyo',
+                beneficiary: 'John Doe',
                 date: '2025-12-13',
                 amount: 1000,
                 settlementAmount: 1500000,
@@ -27,6 +28,7 @@ export const useTransactionStore = defineStore('transactions', () => {
             },
             {
                 id: 2,
+                ref: 'x00075hgksd',
                 from: 'EUR',
                 to: 'USD',
                 beneficiary: 'Chioma Oji',
@@ -37,6 +39,7 @@ export const useTransactionStore = defineStore('transactions', () => {
             },
             {
                 id: 3,
+                ref: 'x00075hgksd',
                 from: 'USD',
                 to: 'EUR',
                 beneficiary: 'New Beneficiary',

@@ -5,22 +5,26 @@ import BaseButton from '@/components/utilities/BaseButton.vue'
 import BaseInput from '@/components/utilities/BaseInput.vue'
 import BaseSelect from '@/components/utilities/BaseSelect.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import DarkModeToggle from '@/components/DarkModeToggle.vue'
+
+import { useAuthStore } from '@/stores/auth'
 import { useCurrencyStore } from '@/stores/currency'
+import { useValidators } from '@/composables/useValidators'
 
 const currencyStore = useCurrencyStore()
+const authStore = useAuthStore()
+const { validateRequired, validateEmail } = useValidators()
 
 // ------------------------
-// User Settings State
+// State
 // ------------------------
 const loading = ref(false)
-const logoutLoading = ref(false)
 const settings = ref({
     userName: 'John Doe',
     userEmail: 'johndoe@gmail.com',
     defaultCurrency: 'USD',
 })
 
-// Errors & hints
 const errors = ref({
     userName: null,
     userEmail: null,
@@ -28,22 +32,18 @@ const errors = ref({
 })
 
 const hints = ref({
-    userName: 'Enter your full name',
-    userEmail: 'Enter your email address',
-    defaultCurrency: 'Select your default currency',
+
 })
 
 // ------------------------
 // Validation
 // ------------------------
-const validate = () => {
-    const { userName, userEmail, defaultCurrency } = settings.value
-
-    errors.value.userName = userName.trim() ? null : 'Name is required'
-    errors.value.userEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)
-        ? null
-        : 'Valid email is required'
-    errors.value.defaultCurrency = defaultCurrency ? null : 'Please select a currency'
+const validateForm = () => {
+    errors.value.userName = validateRequired(settings.value.userName, 'Name is required')
+    errors.value.userEmail =
+        validateRequired(settings.value.userEmail, 'Email is required') ||
+        validateEmail(settings.value.userEmail, 'Invalid email address')
+    errors.value.defaultCurrency = validateRequired(settings.value.defaultCurrency, 'Please select a currency')
 
     return !Object.values(errors.value).some(Boolean)
 }
@@ -51,36 +51,27 @@ const validate = () => {
 // ------------------------
 // Actions
 // ------------------------
-// ------------------------
-// Save Settings
-// ------------------------
-const saveSettings = () => {
-    if (!validate()) return
+const saveSettings = async () => {
+    if (!validateForm()) return
 
     loading.value = true
-
     // Simulate API call
-    setTimeout(() => {
-        console.log('Settings saved:', { ...settings.value })
-        loading.value = false
-    }, 1500)
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    console.log('Settings saved:', { ...settings.value })
+    loading.value = false
+}
+
+const logout = async () => {
+    authStore.loading = true
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await authStore.logout()
+    authStore.loading = false
 }
 
 // ------------------------
-// Logout
+// Lifecycle
 // ------------------------
-const logout = () => {
-    logoutLoading.value = true
-
-    // Simulate logout API call
-    setTimeout(() => {
-        console.log('Logout triggered')
-        logoutLoading.value = false
-        // Implement real logout logic here
-    }, 1000)
-}
-
-// Fetch currencies on mount
 onMounted(async () => {
     await currencyStore.fetchCurrencies()
 })
@@ -88,17 +79,15 @@ onMounted(async () => {
 
 <template>
     <AppLayout>
-        <div class="w-full max-w-xl space-y-8 mx-auto py-6">
+        <div class="w-full max-w-2xl space-y-8 mx-auto py-6">
             <!-- Header -->
             <PageHeader title="Settings" subtitle="Manage your account preferences" />
 
             <!-- Account Info Form -->
             <form @submit.prevent="saveSettings" class="space-y-6">
                 <BaseInput label="Name" v-model="settings.userName" :error="errors.userName" :hint="hints.userName" />
-
                 <BaseInput label="Email" v-model="settings.userEmail" :error="errors.userEmail"
                     :hint="hints.userEmail" />
-
                 <BaseSelect label="Default Currency" v-model="settings.defaultCurrency"
                     :options="currencyStore.currencyOptions" :error="errors.defaultCurrency"
                     :hint="hints.defaultCurrency" :loading="currencyStore.loading" />
@@ -108,9 +97,15 @@ onMounted(async () => {
                 </BaseButton>
             </form>
 
+            <!-- Appearance Mode -->
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Appearance Mode</span>
+                <DarkModeToggle />
+            </div>
+
             <!-- Logout -->
             <div class="pt-4 border-t border-gray-200 dark:border-gray-800">
-                <BaseButton variant="outline" fullWidth @click="logout" :loading="logoutLoading">
+                <BaseButton variant="outline" fullWidth @click="logout" :loading="authStore.loading">
                     Logout
                 </BaseButton>
             </div>

@@ -1,69 +1,77 @@
-/**
- * Shared utility helpers
- * Keep this composable PURE (no state, no side effects)
- */
-export function useUtils() {
-    /**
-     * Format currency with locale support
-     */
-    const formatCurrency = (amount, currency = 'USD', locale = 'en-US') => {
-        if (amount === null || amount === undefined) return '--'
+import { useCurrencyStore } from "@/stores/currency"
+import { useRouter } from "vue-router"
 
-        return new Intl.NumberFormat(locale, {
-            style: 'currency',
-            currency,
-            minimumFractionDigits: 2,
-        }).format(Number(amount))
+export function useUtils() {
+    const router = useRouter()
+    const { currencySymbols } = useCurrencyStore()
+
+    /**
+     * Format number to K, M, B
+     */
+    const formatCompactNumber = (value, decimals = 2) => {
+        if (value === null || value === undefined) return '0'
+
+        const abs = Math.abs(value)
+
+        if (abs >= 1e9) return (value / 1e9).toFixed(decimals) + 'B'
+        if (abs >= 1e6) return (value / 1e6).toFixed(decimals) + 'M'
+        if (abs >= 1e3) return (value / 1e3).toFixed(decimals) + 'K'
+
+        return value.toString()
     }
 
     /**
-     * Format plain numbers (e.g settlementAmount)
+     * Format currency + compact number
+     * e.g. ₦1.2M, $3.4K
      */
+    const formatCurrencyCompact = (
+        value,
+        currency = 'USD',
+        decimals = 2
+    ) => {
+        const symbol = currencySymbols[currency] || ''
+        return `${symbol}${formatCompactNumber(value, decimals)}`
+    }
+
+    /**
+     * Format date
+     */
+    const formatDate = (date) => {
+        if (!date) return ''
+        return new Date(date).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        })
+    }
+
+    /**
+      * Format plain numbers (e.g settlementAmount)
+      */
     const formatNumber = (value, locale = 'en-US') => {
         if (value === null || value === undefined) return '--'
         return new Intl.NumberFormat(locale).format(Number(value))
     }
 
-    /**
-     * Format date (e.g transactions)
-     */
-    const formatDate = (date) => {
-        if (!date) return '--'
-
-        return new Date(date).toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        })
-    }
-
-    /**
-     * Status color helper
-     */
-    const getStatusClass = (status) => {
-        switch (status) {
-            case 'Settled':
-                return 'text-green-600'
-            case 'Pending':
-                return 'text-yellow-600'
-            case 'Failed':
-                return 'text-red-600'
-            default:
-                return 'text-gray-500'
+    const gotoRoute = (route, options = {}) => {
+        if (typeof route === 'string') {
+            router.push(route).catch(err => err)
+        } else if (typeof route === 'object' && route !== null) {
+            const { name, path, params, query } = route
+            if (name) {
+                router.push({ name, params, query, ...options }).catch(err => err)
+            } else if (path) {
+                router.push({ path, params, query, ...options }).catch(err => err)
+            }
         }
     }
 
-    /**
-     * Simulate API delay (used across stores)
-     */
-    const sleep = (ms = 1000) =>
-        new Promise((resolve) => setTimeout(resolve, ms))
 
     return {
-        formatCurrency,
-        formatNumber,
+        formatCompactNumber,
+        formatCurrencyCompact,
         formatDate,
-        getStatusClass,
-        sleep,
+        formatNumber,
+        gotoRoute
     }
 }

@@ -5,15 +5,17 @@ import { RouterLink } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
 import ApiSkeleton from '@/components/ui/ApiSkeleton.vue'
-import WalletCard from '@/components/cards/WalletCard.vue'
 
 import { useTransactionStore } from '@/stores/transactions'
 import { useWalletStore } from '@/stores/wallets'
+import { useUtils } from '@/composables/useUtils'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import TransactionsGrid from '@/components/ui/TransactionsGrid.vue'
+import WalletGrid from '@/components/ui/WalletGrid.vue'
 
 const transactionStore = useTransactionStore()
 const walletStore = useWalletStore()
+const { gotoRoute } = useUtils()
 
 // ------------------------
 // Actions (mock for now)
@@ -42,7 +44,7 @@ onMounted(() => {
             <div class="flex items-center justify-between flex-wrap gap-4">
                 <PageHeader title="Overview" subtitle=" Monitor funding wallets and cross-border settlements" />
 
-                <BaseButton to="/make-payment">
+                <BaseButton @click="gotoRoute('/payment')">
                     Make Payment
                 </BaseButton>
             </div>
@@ -55,12 +57,19 @@ onMounted(() => {
 
                 <ApiSkeleton :loading="walletStore.loading" :error="walletStore.error" :items="walletStore.wallets">
                     <template #default="{ items }">
-                        <div class="flex gap-4 overflow-x-auto scrollbar-none">
-                            <WalletCard v-for="wallet in items" :key="wallet.id" :wallet="wallet"
-                                @deposit="openDepositModal(wallet)" @withdraw="openWithdrawModal(wallet)" />
-                        </div>
+                        <WalletGrid :wallets="items" />
                     </template>
                 </ApiSkeleton>
+            </section>
+
+            <!-- Fx performance -->
+            <section>
+                <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Fx performance
+                </h3>
+                <div class="w-full bg-white dark:bg-gray-800 p-6 mt-3">
+                    FX Chart
+                </div>
             </section>
 
             <!-- Recent Payments -->

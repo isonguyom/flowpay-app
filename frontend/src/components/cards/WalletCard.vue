@@ -1,58 +1,91 @@
 <script setup>
+import { ref, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import BaseButton from '@/components/utilities/BaseButton.vue'
 
+import { useFxStore } from '@/stores/fx'
+import { useUtils } from '@/composables/useUtils'
+import { useHelpers } from '@/composables/useHelpers'
+import { useFx } from '@/composables/useFx'
+
+// Props
 const props = defineProps({
-    wallet: { type: Object, required: true },
-    loading: {
-        type: Boolean,
-        default: false,
+    wallet: {
+        type: Object,
+        required: true,
     },
 })
 
+// Emits
 const emit = defineEmits(['deposit', 'withdraw'])
 
-const statusColor = {
-    Active: 'text-green-600',
-    Frozen: 'text-red-600',
-    Pending: 'text-yellow-600',
+// Stores
+const fxStore = useFxStore()
+const { fxRates, feeRate, loading: fxLoading } = storeToRefs(fxStore)
+
+// Composables
+const { formatCurrencyCompact } = useUtils()
+const { getCurrencyColor } = useHelpers()
+const { convert } = useFx({
+    feeRate: feeRate.value,
+    initialRates: fxRates.value,
+})
+
+// Visibility toggle
+const isVisible = ref(true)
+const toggleVisibility = () => {
+    isVisible.value = !isVisible.value
 }
+
+onMounted(async () => {
+    await fxStore.fetchRates()
+})
+
+// Handlers
+const handleDeposit = () => emit('deposit', props.wallet)
+const handleWithdraw = () => emit('withdraw', props.wallet)
 </script>
 
 <template>
-    <div class="rounded-xl border border-gray-200 dark:border-gray-800
-           bg-white dark:bg-gray-900 p-5 space-y-4 w-full min-w-xs">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <p class="text-xs text-gray-500 dark:text-gray-400">
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-lg min-w-sm space-y-3">
+        <!-- Wallet Header -->
+        <div class="flex justify-between items-center">
+            <span class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">
                 {{ wallet.currency }} Wallet
-            </p>
+            </span>
 
-            <span class="text-xs font-medium" :class="statusColor[wallet.status] || 'text-gray-500'">
-                {{ wallet.status }}
+            <!-- Currency Badge -->
+            <span class="text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
+                :class="getCurrencyColor(wallet.currency)">
+                {{ wallet.currency }}
             </span>
         </div>
 
-        <!-- Balance -->
-        <div>
-            <p v-if="loading" class="h-7 w-32 rounded bg-gray-200 dark:bg-gray-800 animate-pulse" />
+        <!-- Wallet Amount & Dollar Equivalent -->
+        <div class="space-y-1">
+            <div
+                class="flex items-center gap-x-2 font-semibold text-xl text-gray-800 dark:text-gray-100 relative w-fit">
+                <span v-if="isVisible">{{ formatCurrencyCompact(wallet.amount, wallet.currency) }}</span>
+                <span v-else>•••••</span>
 
-            <p v-else class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                {{ Number(wallet.balance).toLocaleString() }}
-                <span class="text-base font-medium text-gray-500">
-                    {{ wallet.currency }}
-                </span>
+                <button type="button" @click="toggleVisibility" class="absolute inset-y-0 -right-5 flex items-center text-gray-500 dark:text-gray-400 text-sm
+                           hover:text-gray-700 dark:hover:text-gray-200
+                           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
+                    :aria-label="isVisible ? 'Hide amount' : 'Show amount'" :aria-pressed="isVisible">
+                    <i :class="isVisible ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'" aria-hidden="true" />
+                </button>
+            </div>
+
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                ≈ $<span v-if="isVisible">{{ convert(wallet.amount, wallet.currency, 'USD', false) || 0 }}</span>
+                <span v-else>•••••</span>
             </p>
         </div>
 
-        <!-- Actions -->
-        <div class="flex gap-3">
-            <BaseButton size="sm" fullWidth @click="emit('deposit')" :disabled="loading">
-                Deposit
-            </BaseButton>
-
-            <BaseButton size="sm" variant="outline" fullWidth @click="emit('withdraw')" :disabled="loading">
-                Withdraw
-            </BaseButton>
+        <!-- Deposit & Withdraw -->
+        <div class="flex justify-between gap-4">
+            <BaseButton variant="solid" class="w-full" @click="handleDeposit">Deposit</BaseButton>
+            <BaseButton variant="outline" class="w-full" @click="handleWithdraw">Withdraw</BaseButton>
         </div>
     </div>
 </template>

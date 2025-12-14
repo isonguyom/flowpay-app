@@ -7,6 +7,26 @@ export const useCurrencyStore = defineStore('currency', () => {
     const loading = ref(false)
     const error = ref(null)
 
+    const currencySymbols = {
+        NGN: '₦',
+        USD: '$',
+        EUR: '€',
+        GBP: '£',
+        GHS: '₵',
+        KES: 'KSh',
+        ZAR: 'R',
+    }
+
+    const currencyColorMap = {
+        USD: 'bg-green-500',
+        EUR: 'bg-blue-500',
+        NGN: 'bg-indigo-500',
+        GBP: 'bg-purple-500',
+        JPY: 'bg-red-500',
+        AUD: 'bg-yellow-500',
+        CAD: 'bg-pink-500',
+    }
+
     // --- Actions ---
     const fetchCurrencies = async () => {
         loading.value = true
@@ -38,6 +58,8 @@ export const useCurrencyStore = defineStore('currency', () => {
         currencyOptions,
         loading,
         error,
+        currencySymbols,
+        currencyColorMap,
         fetchCurrencies,
     }
 })

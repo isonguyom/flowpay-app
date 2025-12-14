@@ -16,19 +16,19 @@ export const useWalletStore = defineStore('wallets', () => {
         {
             id: 1,
             currency: 'USD',
-            balance: 12500.75,
+            amount: 12500.75,
             status: 'Active',
         },
         {
             id: 2,
             currency: 'EUR',
-            balance: 4300.2,
+            amount: 4300.2,
             status: 'Active',
         },
         {
             id: 3,
             currency: 'NGN',
-            balance: 985000,
+            amount: 985000,
             status: 'Pending',
         },
     ]
