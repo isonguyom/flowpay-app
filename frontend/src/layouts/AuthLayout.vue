@@ -1,4 +1,6 @@
 <script setup>
+import DarkModeToggle from '@/components/DarkModeToggle.vue';
+
 const year = new Date().getFullYear()
 </script>
 
@@ -9,7 +11,7 @@ const year = new Date().getFullYear()
              px-6 py-8 sm:px-8" role="region" aria-labelledby="auth-title">
             <!-- Brand -->
             <header class="mb-8 text-center">
-                <h1 id="auth-title" class="text-3xl font-bold text-brand">
+                <h1 class="text-3xl font-bold text-brand">
                     FlowPay
                 </h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -23,8 +25,10 @@ const year = new Date().getFullYear()
             </div>
 
             <!-- Footer -->
-            <footer class="mt-8 text-center text-xs text-gray-500 dark:text-gray-400">
-                © {{ year }} FlowPay
+            <footer
+                class="mt-8 text-center text-xs text-gray-500 dark:text-gray-400 flex flex-col justify-center items-center gap-1">
+                <p>© {{ year }} FlowPay</p>
+                <DarkModeToggle />
             </footer>
         </section>
     </main>

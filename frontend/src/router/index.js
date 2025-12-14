@@ -12,7 +12,7 @@ const router = createRouter({
     },
     { path: '/login', component: () => import('../views/LoginView.vue') },
     { path: '/dashboard', component: () => import('../views/DashboardView.vue') },
-    { path: '/send', component: () => import('../views/SendView.vue') },
+    { path: '/payment', component: () => import('../views/PaymentView.vue') },
     { path: '/transactions', component: () => import('../views/TransactionsView.vue') },
     { path: '/settings', component: () => import('../views/SettingsView.vue') },
   ],

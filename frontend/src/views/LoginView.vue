@@ -4,7 +4,9 @@ import { ref, watch } from 'vue'
 import BaseInput from '@/components/utilities/BaseInput.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 let emailTimeout
 let passwordTimeout
 const loading = ref(false)
@@ -71,6 +73,7 @@ const login = async () => {
     setTimeout(() => {
         loading.value = false
         console.log('Login success:', { ...form.value })
+        router.push('/dashboard')
     }, 1000)
 }
 </script>
