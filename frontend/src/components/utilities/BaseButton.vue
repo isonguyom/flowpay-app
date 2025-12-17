@@ -43,8 +43,8 @@ const variantClasses = computed(() => {
       `
         case 'ghost':
             return `
-        text-gray-700 dark:text-gray-300
-        hover:bg-gray-100 dark:hover:bg-gray-800
+        text-brand
+        hover:text-brand/80
         focus-visible:ring-gray-400
       `
         case 'soft':
@@ -65,11 +65,11 @@ const variantClasses = computed(() => {
 const sizeClasses = computed(() => {
     switch (props.size) {
         case 'sm':
-            return 'px-3 py-1.5 text-sm'
+            return props.variant === 'ghost' ? 'text-sm p-1' : 'px-3 py-1.5 text-sm'
         case 'lg':
-            return 'px-6 py-3 text-base'
+            return props.variant === 'ghost' ? 'text-lg p-1' : 'px-6 py-3 text-base'
         default:
-            return 'px-4 py-2.5 text-sm'
+            return props.variant === 'ghost' ? 'text-base p-1' : 'px-4 py-2.5 text-sm'
     }
 })
 </script>

@@ -6,6 +6,9 @@ import express from 'express'
 import mongoose from 'mongoose'
 import cors from 'cors'
 import authRoutes from './routes/auth.js'
+import paymentRoutes from './routes/payments.js'
+import transactionRoutes from './routes/transactions.js'
+import walletRoutes from './routes/wallets.js'
 
 
 const app = express()
@@ -17,6 +20,12 @@ app.use(express.json())
 
 // ---------------- Routes ----------------
 app.use('/api/auth', authRoutes)
+app.use('/api/payments', paymentRoutes)
+app.use('/api/transactions', transactionRoutes)
+app.use('/api/wallets', walletRoutes)
+
+
+
 
 // Test route
 app.get("/api/health", (req, res) => {

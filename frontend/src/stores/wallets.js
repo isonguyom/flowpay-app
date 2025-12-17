@@ -1,5 +1,7 @@
+// stores/wallet.js
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import api from '@/services/api'
 
 export const useWalletStore = defineStore('wallets', () => {
     // ------------------------
@@ -10,43 +12,73 @@ export const useWalletStore = defineStore('wallets', () => {
     const error = ref(null)
 
     // ------------------------
-    // Mock Data
-    // ------------------------
-    const mockWallets = [
-        {
-            id: 1,
-            currency: 'USD',
-            amount: 12500.75,
-            status: 'Active',
-        },
-        {
-            id: 2,
-            currency: 'EUR',
-            amount: 4300.2,
-            status: 'Active',
-        },
-        {
-            id: 3,
-            currency: 'NGN',
-            amount: 985000,
-            status: 'Pending',
-        },
-    ]
-
-    // ------------------------
     // Actions
     // ------------------------
     const fetchWallets = async () => {
         loading.value = true
         error.value = null
-
         try {
-            // simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 1200))
-
-            wallets.value = mockWallets
+            const res = await api.get('/wallets')
+            wallets.value = res.data.wallets || []
         } catch (err) {
-            error.value = 'Failed to load wallets'
+            console.error('Fetch wallets error:', err.response?.data || err)
+            error.value = err.response?.data?.message || 'Failed to load wallets'
+        } finally {
+            loading.value = false
+        }
+    }
+
+    const createWallet = async ({ currency, amount = 0 }) => {
+        loading.value = true
+        error.value = null
+        try {
+            // if currency is an object, pick its value
+            const currencyValue = typeof currency === 'object' ? currency.value : currency
+            const res = await api.post('/wallets', { currency: currencyValue, amount })
+            wallets.value.push(res.data.wallet)
+            return res.data.wallet
+        } catch (err) {
+            console.error('Create wallet error:', err.response?.data || err)
+            error.value = err.response?.data?.message || 'Failed to create wallet'
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    const fundWallet = async (walletId, amount) => {
+        loading.value = true
+        error.value = null
+        try {
+            const res = await api.patch(`/wallets/${walletId}/fund`, { amount })
+            const index = wallets.value.findIndex(w => w._id === walletId)
+            if (index !== -1) {
+                wallets.value[index].amount = res.data.wallet.amount
+            }
+            return res.data.wallet
+        } catch (err) {
+            console.error('Fund wallet error:', err.response?.data || err)
+            error.value = err.response?.data?.message || 'Failed to fund wallet'
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    const withdrawWallet = async (walletId, amount) => {
+        loading.value = true
+        error.value = null
+        try {
+            const res = await api.patch(`/wallets/${walletId}/withdraw`, { amount })
+            const index = wallets.value.findIndex(w => w._id === walletId)
+            if (index !== -1) {
+                wallets.value[index].amount = res.data.wallet.amount
+            }
+            return res.data.wallet
+        } catch (err) {
+            console.error('Withdraw wallet error:', err.response?.data || err)
+            error.value = err.response?.data?.message || 'Failed to withdraw wallet'
+            throw err
         } finally {
             loading.value = false
         }
@@ -57,5 +89,8 @@ export const useWalletStore = defineStore('wallets', () => {
         loading,
         error,
         fetchWallets,
+        createWallet,
+        fundWallet,
+        withdrawWallet,
     }
 })

@@ -31,6 +31,11 @@ const router = createRouter({
     },
 
     {
+      path: '/wallets/create',
+      meta: { requiresAuth: true },
+      component: () => import('@/views/CreateWalletView.vue'),
+    },
+    {
       path: '/payment',
       meta: { requiresAuth: true },
       component: () => import('@/views/PaymentView.vue'),

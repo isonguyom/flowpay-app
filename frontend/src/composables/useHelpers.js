@@ -13,7 +13,7 @@ export function useHelpers() {
      * ---------------------------------- */
     const getStatusClass = (status) => {
         switch (status) {
-            case 'Settled':
+            case 'Completed':
                 return 'text-green-600'
             case 'Pending':
                 return 'text-yellow-600'
@@ -26,8 +26,8 @@ export function useHelpers() {
 
     const getStatusLabel = (status) => {
         switch (status) {
-            case 'Settled':
-                return 'Settled'
+            case 'Completed':
+                return 'Completed'
             case 'Pending':
                 return 'Pending'
             case 'Failed':

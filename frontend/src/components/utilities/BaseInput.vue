@@ -25,6 +25,15 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    min: {
+        type: [String, Number]
+    },
+    max: {
+        type: [String, Number]
+    },
+    step: {
+        type: [String, Number]
+    }
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -60,7 +69,7 @@ const describedBy = computed(() => {
         <!-- Input Wrapper -->
         <div class="relative">
             <input :id="inputId" :type="inputType" :placeholder="placeholder" :value="modelValue" :disabled="disabled"
-                :aria-invalid="hasError" :aria-describedby="describedBy"
+                :min="min" , :max="max" :aria-invalid="hasError" :aria-describedby="describedBy"
                 @input="emit('update:modelValue', $event.target.value)" class="w-full rounded-lg border px-4 py-2.5 pr-11 text-sm transition
                focus:outline-none focus:ring-2
                disabled:opacity-50 disabled:cursor-not-allowed" :class="hasError

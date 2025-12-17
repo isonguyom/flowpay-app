@@ -2,7 +2,7 @@
 import TransactionCard from '@/components/cards/TransactionCard.vue'
 
 defineProps({
-    payments: {
+    transactions: {
         type: Array,
         default: () => [],
     },
@@ -15,6 +15,6 @@ defineProps({
            bg-white dark:bg-gray-900
            divide-y divide-gray-200 dark:divide-gray-800">
         <!-- Transactions -->
-        <TransactionCard v-for="payment in payments" :key="payment.id" :payment="payment" />
+        <TransactionCard v-for="trx in transactions" :key="trx.id" :transaction="trx" />
     </div>
 </template>

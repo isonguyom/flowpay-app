@@ -1,6 +1,7 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
+import Wallet from '../models/Wallet.js'
 import { protect } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -19,7 +20,7 @@ const generateToken = (id) => {
 // -----------------------------
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body
+        const { name, email, password, defaultCurrency } = req.body
 
         if (!name || !email || !password) {
             return res.status(400).json({ message: 'All fields are required' })
@@ -30,20 +31,38 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'User already exists' })
         }
 
-        const user = await User.create({ name, email, password })
+        // 1. Create the user
+        const user = await User.create({
+            name,
+            email,
+            password,
+            defaultCurrency: defaultCurrency || 'USD', // default if not provided
+        })
 
+        // 2. Automatically create the default wallet
+        await Wallet.create({
+            user: user._id,
+            currency: user.defaultCurrency,
+            amount: 0,
+            status: 'Active',
+        })
+
+        // 3. Respond with user + token
         res.status(201).json({
             user: {
                 id: user._id,
                 name: user.name,
                 email: user.email,
+                defaultCurrency: user.defaultCurrency,
             },
             token: generateToken(user._id),
         })
     } catch (error) {
+        console.error('Register error:', error)
         res.status(500).json({ message: 'Server error', error: error.message })
     }
 })
+
 
 // -----------------------------
 // Login

@@ -17,7 +17,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['deposit', 'withdraw'])
+const emit = defineEmits(['fund', 'withdraw'])
 
 // Stores
 const fxStore = useFxStore()
@@ -42,7 +42,7 @@ onMounted(async () => {
 })
 
 // Handlers
-const handleDeposit = () => emit('deposit', props.wallet)
+const handleFund = () => emit('fund', props.wallet)
 const handleWithdraw = () => emit('withdraw', props.wallet)
 </script>
 
@@ -84,7 +84,7 @@ const handleWithdraw = () => emit('withdraw', props.wallet)
 
         <!-- Deposit & Withdraw -->
         <div class="flex justify-between gap-4">
-            <BaseButton variant="solid" class="w-full" @click="handleDeposit" size="sm">Deposit</BaseButton>
+            <BaseButton variant="solid" class="w-full" @click="handleFund" size="sm">Fund</BaseButton>
             <BaseButton variant="outline" class="w-full" @click="handleWithdraw" size="sm">Withdraw</BaseButton>
         </div>
     </div>
