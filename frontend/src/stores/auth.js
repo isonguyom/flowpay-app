@@ -1,16 +1,13 @@
-// src/stores/auth.js
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useHelpers } from '@/composables/useHelpers'
+import api from '@/services/api' // Axios instance
 
 export const useAuthStore = defineStore('auth', () => {
-
-    const { simulateDelay } = useHelpers()
     // ------------------------
     // State
     // ------------------------
-    const user = ref(null)
-    const token = ref(null)
+    const user = ref(JSON.parse(localStorage.getItem('user')) || null)
+    const token = ref(localStorage.getItem('token') || null)
     const loading = ref(false)
     const error = ref(null)
 
@@ -18,42 +15,94 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     // ------------------------
 
-    // Simulated login
-    const login = async (email, password) => {
+    // Register new user
+    const register = async (name, email, password) => {
         loading.value = true
         error.value = null
-
         try {
-            // Simulate network/API call
-            await simulateDelay(1500)
+            const res = await api.post('/auth/register', { name, email, password })
 
-            // Example response
-            user.value = { id: 1, name: 'John Doe', email }
-            token.value = 'fake-jwt-token'
+            user.value = res.data.user
+            token.value = res.data.token
 
-            console.log('User logged in:', user.value)
+            localStorage.setItem('user', JSON.stringify(user.value))
+            localStorage.setItem('token', token.value)
+
+            console.log('User registered:', user.value)
+            return true // ✅ indicates success
         } catch (err) {
-            error.value = 'Login failed'
+            console.error(err)
+            error.value = err.response?.data?.message || 'Registration failed'
+            return false // ❌ indicates failure
         } finally {
             loading.value = false
         }
     }
 
-    // Logout
-    const logout = async () => {
+    // Login existing user
+    const login = async (email, password) => {
         loading.value = true
-        await simulateDelay(1000)
+        error.value = null
+        try {
+            const res = await api.post('/auth/login', { email, password })
 
+            user.value = res.data.user
+            token.value = res.data.token
 
-        user.value = null
-        token.value = null
-        loading.value = false
+            localStorage.setItem('user', JSON.stringify(user.value))
+            localStorage.setItem('token', token.value)
 
-        console.log('User logged out')
+            console.log('User logged in:', user.value)
+            return true // ✅ indicates success
+        } catch (err) {
+            console.error(err)
+            error.value = err.response?.data?.message || 'Login failed'
+            return false // ❌ indicates failure
+        } finally {
+            loading.value = false
+        }
     }
 
-    // Check if user is authenticated
+    const fetchMe = async () => {
+        if (!token.value) return
+
+        try {
+            const res = await api.get('/auth/me', {
+                headers: {
+                    Authorization: `Bearer ${token.value}`,
+                },
+            })
+
+            user.value = res.data
+            localStorage.setItem('user', JSON.stringify(res.data))
+        } catch {
+            logout()
+        }
+    }
+
+
+    // Logout
+    const logout = () => {
+        user.value = null
+        token.value = null
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+        console.log('User logged out')
+        return true
+    }
+
+    // Check if authenticated
     const isAuthenticated = () => !!user.value && !!token.value
 
-    return { user, token, loading, error, login, logout, isAuthenticated }
+    return {
+        user,
+        token,
+        loading,
+        error,
+        register,
+        login,
+        logout,
+        isAuthenticated,
+        fetchMe
+    }
 })

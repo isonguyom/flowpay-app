@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: flowpaydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://app:app@db:5432/flowpaydb
+    ports:
+      - "8000:8000"
+    develop:
+      watch:
+        # Live-sync backend source code
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - __pycache__/
+            - .venv/
+        # Rebuild image if dependencies change
+        - action: rebuild
+          path: ./backend/requirements.txt
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://backend:8000
+    ports:
+      - "5173:5173"
+    develop:
+      watch:
+        # Live-sync Vue source files
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        # Rebuild image if deps change
+        - action: rebuild
+          path: ./frontend/package.json
+
+volumes:
+  db_data:

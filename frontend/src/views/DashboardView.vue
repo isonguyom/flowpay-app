@@ -41,10 +41,10 @@ onMounted(() => {
     <AppLayout>
         <div class="space-y-8">
             <!-- Header -->
-            <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center justify-between flex-wrap gap-3">
                 <PageHeader title="Overview" subtitle=" Monitor funding wallets and cross-border settlements" />
 
-                <BaseButton @click="gotoRoute('/payment')">
+                <BaseButton @click="gotoRoute('/payment')" size="sm">
                     Make Payment
                 </BaseButton>
             </div>

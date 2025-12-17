@@ -84,8 +84,8 @@ const handleWithdraw = () => emit('withdraw', props.wallet)
 
         <!-- Deposit & Withdraw -->
         <div class="flex justify-between gap-4">
-            <BaseButton variant="solid" class="w-full" @click="handleDeposit">Deposit</BaseButton>
-            <BaseButton variant="outline" class="w-full" @click="handleWithdraw">Withdraw</BaseButton>
+            <BaseButton variant="solid" class="w-full" @click="handleDeposit" size="sm">Deposit</BaseButton>
+            <BaseButton variant="outline" class="w-full" @click="handleWithdraw" size="sm">Withdraw</BaseButton>
         </div>
     </div>
 </template>

@@ -20,7 +20,7 @@ const onWithdraw = (wallet) => {
 </script>
 
 <template>
-    <div class="flex justify-around gap-4 overflow-x-auto scrollbar-none">
+    <div class="flex justify-around gap-4 overflow-x-auto scrollbar-none pb-2">
         <WalletCard v-for="wallet in wallets" :key="wallet.id" :wallet="wallet" @deposit="onDeposit"
             @withdraw="onWithdraw" />
     </div>

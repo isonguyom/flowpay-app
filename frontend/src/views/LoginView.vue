@@ -5,11 +5,16 @@ import BaseInput from '@/components/utilities/BaseInput.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
+
 let emailTimeout
 let passwordTimeout
+
 const loading = ref(false)
+
 const form = ref({
     email: '',
     password: ''
@@ -25,7 +30,9 @@ const hints = ref({
     password: 'Password must be at least 8 characters'
 })
 
-// --- Validation functions ---
+/* -------------------------
+   Validation
+-------------------------- */
 const validateEmail = (value) => {
     if (!value) errors.value.email = 'Email is required'
     else if (!/^\S+@\S+\.\S+$/.test(value)) errors.value.email = 'Email is invalid'
@@ -38,14 +45,14 @@ const validatePassword = (value) => {
     else errors.value.password = null
 }
 
-// --- Debounced watchers ---
+/* -------------------------
+   Debounced watchers
+-------------------------- */
 watch(
     () => form.value.email,
     (newVal) => {
         clearTimeout(emailTimeout)
-        emailTimeout = setTimeout(() => {
-            validateEmail(newVal)
-        }, 300) // 300ms debounce
+        emailTimeout = setTimeout(() => validateEmail(newVal), 300)
     }
 )
 
@@ -53,15 +60,13 @@ watch(
     () => form.value.password,
     (newVal) => {
         clearTimeout(passwordTimeout)
-        passwordTimeout = setTimeout(() => {
-            validatePassword(newVal)
-        }, 300) // 300ms debounce
+        passwordTimeout = setTimeout(() => validatePassword(newVal), 300)
     }
 )
 
+
 // --- Login handler ---
 const login = async () => {
-    // Validate on submit
     validateEmail(form.value.email)
     validatePassword(form.value.password)
 
@@ -69,12 +74,18 @@ const login = async () => {
 
     loading.value = true
 
-    // TEMP: simulate login
-    setTimeout(() => {
+    try {
+        const success = await authStore.login(form.value.email, form.value.password)
+
+        if (success) {
+            // Only redirect if login was successful
+            router.push('/dashboard')
+        }
+    } catch (err) {
+        console.error(err)
+    } finally {
         loading.value = false
-        console.log('Login success:', { ...form.value })
-        router.push('/dashboard')
-    }, 1000)
+    }
 }
 </script>
 
@@ -88,9 +99,13 @@ const login = async () => {
             <BaseInput id="signin-password" label="Password" type="password" placeholder="••••••••"
                 v-model="form.password" :error="errors.password" :hint="hints.password" />
 
-            <BaseButton fullWidth type="submit" :loading="loading">
+            <BaseButton fullWidth type="submit" :loading="loading || authStore.loading">
                 <span>Sign in</span>
             </BaseButton>
+
+            <p v-if="authStore.error" class="text-sm text-red-600 text-center">
+                {{ authStore.error }}
+            </p>
 
         </form>
     </AuthLayout>
