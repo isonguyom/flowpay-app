@@ -68,8 +68,9 @@ jobs:
       # ------------------------
       # Build Docker Images
       # ------------------------
-      - name: Build Docker Compose
-        run: docker-compose -f docker-compose.yml build
+      - name: Build Docker Compose services
+        run: docker compose -f docker-compose.yml build
+
 
   # Optional: Deploy Job
   deploy:
