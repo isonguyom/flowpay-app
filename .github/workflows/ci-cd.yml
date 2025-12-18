@@ -89,10 +89,10 @@ jobs:
 
       - name: Build and Push Backend Image
         run: |
-          docker build -t your-dockerhub-username/backend:latest ./backend
-          docker push your-dockerhub-username/backend:latest
+          docker build -t isonguyom/backend:latest ./backend
+          docker push isonguyom/backend:latest
 
       - name: Build and Push Frontend Image
         run: |
-          docker build -t your-dockerhub-username/frontend:latest ./frontend
-          docker push your-dockerhub-username/frontend:latest
+          docker build -t isonguyom/frontend:latest ./frontend
+          docker push isonguyom/frontend:latest
