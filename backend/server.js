@@ -16,8 +16,21 @@ import webhookRoutes from './routes/webhook.js'
 const app = express()
 const PORT = process.env.PORT || 8000
 
+// ✅ Environment check (bootstrap-level)
+if (process.env.NODE_ENV !== 'production') {
+    console.log('Dev mode enabled')
+}
+
 // ---------------- Middleware ----------------
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
+app.use(cors({
+    origin: [
+        'http://localhost:5173',              // local dev
+        'http://frontend:5173',
+        'https://flowpayapp.vercel.app'    // production
+    ],
+    credentials: true
+}))
+
 app.use(express.json())
 
 // ---------------- Routes ----------------
