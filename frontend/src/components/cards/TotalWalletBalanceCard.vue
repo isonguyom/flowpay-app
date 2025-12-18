@@ -24,13 +24,14 @@ const emit = defineEmits(['createWallet', 'makePayment'])
 
 // Stores
 const fxStore = useFxStore()
-const { fxRates, feeRate } = storeToRefs(fxStore)
+const { fxList, feeRate, loading: fxLoading } = storeToRefs(fxStore)
 
 // Composables
 const { formatCurrencyCompact } = useUtils()
+
 const { convert } = useFx({
-    feeRate: feeRate.value,
-    initialRates: fxRates.value,
+    feeRate,
+    rates: fxList,
 })
 
 // Visibility toggle
@@ -45,7 +46,7 @@ const handleMakePayment = () => emit('makePayment')
 const convertedUSD = computed(() => convert(props.totalBalance, props.defaultCurrency, 'USD', false) || '0.00')
 
 onMounted(async () => {
-    await fxStore.fetchRates()
+    await fxStore.fetchFx()
 })
 </script>
 
@@ -61,7 +62,7 @@ onMounted(async () => {
                     <div
                         class="text-2xl md:text-4xl not-[]:flex items-center gap-x-2 font-semibold text-gray-800 dark:text-gray-100 relative w-fit">
                         <span v-if="isVisible">{{ formatCurrencyCompact(totalBalance, defaultCurrency) || '0.00'
-                        }}</span>
+                            }}</span>
                         <span v-else>•••••</span>
 
                         <button type="button" @click="toggleVisibility" class="absolute inset-y-0 -right-5 flex items-center text-gray-500 dark:text-gray-400 text-sm

@@ -21,14 +21,15 @@ const emit = defineEmits(['fund', 'withdraw'])
 
 // Stores
 const fxStore = useFxStore()
-const { fxRates, feeRate, loading: fxLoading } = storeToRefs(fxStore)
+const { fxList, feeRate, loading: fxLoading } = storeToRefs(fxStore)
 
 // Composables
 const { formatCurrencyCompact } = useUtils()
 const { getCurrencyColor } = useHelpers()
+
 const { convert } = useFx({
-    feeRate: feeRate.value,
-    initialRates: fxRates.value,
+    feeRate,
+    rates: fxList,
 })
 
 // Visibility toggle
@@ -38,7 +39,7 @@ const toggleVisibility = () => {
 }
 
 onMounted(async () => {
-    await fxStore.fetchRates()
+    await fxStore.fetchFx()
 })
 
 // Handlers

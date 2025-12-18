@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 
 import AppLayout from '@/layouts/AppLayout.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -10,13 +11,15 @@ import DarkModeToggle from '@/components/DarkModeToggle.vue'
 
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
-import { useCurrencyStore } from '@/stores/currency'
+import { useFxStore } from '@/stores/fx'
 import { useValidators } from '@/composables/useValidators'
 import { useUtils } from '@/composables/useUtils'
 
 const authStore = useAuthStore()
 const userStore = useUserStore()
-const currencyStore = useCurrencyStore()
+const fxStore = useFxStore()
+
+const { fxList, loading: fxLoading } = storeToRefs(fxStore)
 const { gotoRoute } = useUtils()
 const { validateRequired, validateEmail } = useValidators()
 
@@ -80,7 +83,6 @@ const saveSettings = async () => {
 
     loading.value = true
     try {
-        console.log('TOKEN:', authStore.token)
 
         await userStore.updateProfile({
             name: settings.value.userName,
@@ -88,9 +90,8 @@ const saveSettings = async () => {
             defaultCurrency: settings.value.defaultCurrency,
         })
 
-        console.log('Settings updated successfully')
     } catch (err) {
-        console.error('Failed to update settings', err)
+        errors.value.userEmail
     } finally {
         loading.value = false
     }
@@ -109,7 +110,7 @@ const logout = () => {
 // Lifecycle
 // ------------------------
 onMounted(async () => {
-    await currencyStore.fetchCurrencies()
+    await fxStore.fetchFx()
 
     if (authStore.isAuthenticated() && !userStore.profile) {
         await userStore.fetchProfile()
@@ -129,9 +130,8 @@ onMounted(async () => {
 
                 <BaseInput label="Email" v-model="settings.userEmail" :error="errors.userEmail" />
 
-                <BaseSelect label="Default Currency" v-model="settings.defaultCurrency"
-                    :options="currencyStore.currencyOptions" :error="errors.defaultCurrency"
-                    :loading="currencyStore.loading" />
+                <BaseSelect label="Default Currency" v-model="settings.defaultCurrency" :options="fxList"
+                    :error="errors.defaultCurrency" :loading="fxLoading" />
 
                 <BaseButton type="submit" fullWidth :loading="loading">
                     Save Settings

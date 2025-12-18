@@ -79,7 +79,7 @@ const register = async () => {
             router.push('/dashboard') // Only redirect if registration was successful
         }
     } catch (err) {
-        console.error(err)
+        errors.value.email
     } finally {
         loading.value = false
     }
@@ -103,7 +103,7 @@ const register = async () => {
                 <span>Register</span>
             </BaseButton>
 
-              <p v-if="authStore.error" class="text-sm text-red-600 text-center">
+            <p v-if="authStore.error" class="text-sm text-red-600 text-center">
                 {{ authStore.error }}
             </p>
 

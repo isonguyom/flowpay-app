@@ -1,4 +1,3 @@
-// server.js
 import dotenv from 'dotenv'
 dotenv.config()
 
@@ -9,6 +8,9 @@ import authRoutes from './routes/auth.js'
 import paymentRoutes from './routes/payments.js'
 import transactionRoutes from './routes/transactions.js'
 import walletRoutes from './routes/wallets.js'
+import fxRoutes from './routes/fx.js'
+import webhookRoutes from './routes/webhook.js'
+
 
 
 const app = express()
@@ -23,7 +25,8 @@ app.use('/api/auth', authRoutes)
 app.use('/api/payments', paymentRoutes)
 app.use('/api/transactions', transactionRoutes)
 app.use('/api/wallets', walletRoutes)
-
+app.use('/api/fx', fxRoutes)
+app.use('/api/webhooks', webhookRoutes)
 
 
 

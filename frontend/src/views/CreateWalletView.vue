@@ -10,17 +10,16 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import ConfirmModal from '@/components/utilities/ConfirmModal.vue'
 import BaseToast from '@/components/utilities/BaseToast.vue'
 
-import { useCurrencyStore } from '@/stores/currency'
 import { useWalletStore } from '@/stores/wallets'
+import { useFxStore } from '@/stores/fx'
 
 // ------------------------
 // Stores
 // ------------------------
 const walletStore = useWalletStore()
-const currencyStore = useCurrencyStore()
+const fxStore = useFxStore()
 
-const { loading: walletLoading, error: walletError } = storeToRefs(walletStore)
-const { currencyOptions, loading: currencyLoading } = storeToRefs(currencyStore)
+const { fxList, loading: fxLoading } = storeToRefs(fxStore)
 
 // ------------------------
 // Form State
@@ -88,7 +87,7 @@ const createWallet = async () => {
         )
 
         // Reset form
-        wallet.value.currency = currencyOptions[0]?.value || ''
+        wallet.value.currency = fxList[0]?.value || ''
         touched.value.currency = false
     } catch (err) {
         toastRef.value.addToast(walletStore.error || 'Failed to create wallet', 'error')
@@ -101,8 +100,8 @@ const createWallet = async () => {
 // Lifecycle
 // ------------------------
 onMounted(async () => {
-    await currencyStore.fetchCurrencies()
-    wallet.value.currency = currencyOptions[0]?.value || ''
+    await fxStore.fetchFx()
+    wallet.value.currency = fxList[0]?.value || ''
 })
 </script>
 
@@ -112,11 +111,11 @@ onMounted(async () => {
             <PageHeader title="Create Wallet" subtitle="Add a new currency wallet to your account" />
 
             <form @submit.prevent="confirmCreateWallet" class="space-y-6">
-                <BaseSelect label="Currency" v-model="wallet.currency" :options="currencyOptions"
-                    :loading="currencyLoading" :error="errors.currency" @change="touched.currency = true" />
+                <BaseSelect label="Currency" v-model="wallet.currency" :options="fxList" :loading="fxLoading"
+                    :error="errors.currency" @change="touched.currency = true" />
 
                 <BaseInput label="Initial Amount" type="number" placeholder="0.00" v-model="wallet.initialAmount"
-                    :readonly="true" :error="null" :disabled="true" />
+                    :readonly="true" :error="null" :disabled="true" :max="'0'" min="0" />
 
                 <BaseButton type="submit" fullWidth :disabled="!isFormValid || loading" :loading="loading">
                     Create Wallet

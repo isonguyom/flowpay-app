@@ -1,37 +1,33 @@
-import { useCurrencyStore } from "@/stores/currency"
+import { useFxStore } from "@/stores/fx"
 import { useRouter } from "vue-router"
 
 export function useUtils() {
     const router = useRouter()
-    const { currencySymbols } = useCurrencyStore()
+    const fxStore = useFxStore()
 
-    /**
-     * Format number to K, M, B with 2 decimals
-     */
     const formatCompactNumber = (value, decimals = 2) => {
         if (value === null || value === undefined) return '0.00'
 
         const abs = Math.abs(value)
-
         if (abs >= 1e9) return (value / 1e9).toFixed(decimals) + 'B'
         if (abs >= 1e6) return (value / 1e6).toFixed(decimals) + 'M'
         if (abs >= 1e3) return (value / 1e3).toFixed(decimals) + 'K'
-
         return value.toFixed(decimals)
     }
 
-    /**
-     * Format currency + compact number
-     * e.g. ₦1.20M, $3.40K, $12.00
-     */
+    const defaultSymbols = {
+        USD: '$', NGN: '₦', EUR: '€', GBP: '£', JPY: '¥',
+        AUD: 'A$', CAD: 'C$', BRL: 'R$', CHF: 'CHF'
+    }
+
     const formatCurrencyCompact = (value, currency = 'USD', decimals = 2) => {
-        const symbol = currencySymbols[currency] || ''
+        // ALWAYS access fxList from store directly
+        const fxList = fxStore.fxList.value || []
+        const fxItem = fxList.find(c => c.value === currency)
+        const symbol = fxItem?.symbol || defaultSymbols[currency] || currency
         return `${symbol}${formatCompactNumber(value, decimals)}`
     }
 
-    /**
-     * Format plain numbers (e.g settlementAmount) to 2 decimals
-     */
     const formatNumber = (value, locale = 'en-US', decimals = 2) => {
         if (value === null || value === undefined) return '--'
         return Number(value).toLocaleString(locale, {
@@ -40,31 +36,19 @@ export function useUtils() {
         })
     }
 
-    /**
-     * Format date
-     */
     const formatDate = (date) => {
         if (!date) return '--'
         const d = typeof date === 'string' ? new Date(date) : date
-        if (isNaN(d.getTime())) return '--' // invalid date
-        return d.toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        })
+        if (isNaN(d.getTime())) return '--'
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     }
 
-
     const gotoRoute = (route, options = {}) => {
-        if (typeof route === 'string') {
-            router.push(route).catch(err => err)
-        } else if (typeof route === 'object' && route !== null) {
+        if (typeof route === 'string') router.push(route).catch(err => err)
+        else if (typeof route === 'object' && route !== null) {
             const { name, path, params, query } = route
-            if (name) {
-                router.push({ name, params, query, ...options }).catch(err => err)
-            } else if (path) {
-                router.push({ path, params, query, ...options }).catch(err => err)
-            }
+            if (name) router.push({ name, params, query, ...options }).catch(err => err)
+            else if (path) router.push({ path, params, query, ...options }).catch(err => err)
         }
     }
 

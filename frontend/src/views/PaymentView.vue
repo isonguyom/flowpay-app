@@ -11,25 +11,26 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import ConfirmModal from '@/components/utilities/ConfirmModal.vue'
 import BaseToast from '@/components/utilities/BaseToast.vue'
 
-import { useCurrencyStore } from '@/stores/currency'
 import { useFxStore } from '@/stores/fx'
 import { usePaymentStore } from '@/stores/payment'
 import { useWalletStore } from '@/stores/wallets'
 
 import { useFx } from '@/composables/useFx'
+import { useUtils } from '@/composables/useUtils'
 
 const paymentStore = usePaymentStore()
-const currencyStore = useCurrencyStore()
 const fxStore = useFxStore()
 const walletStore = useWalletStore()
 
-const { fxRates, feeRate, loading: fxLoading } = storeToRefs(fxStore)
+const { fxList, feeRate, loading: fxLoading } = storeToRefs(fxStore)
 const { wallets, loading: walletsLoading } = storeToRefs(walletStore)
 
-const { getRate, calculateFee, convert } = useFx({
-    feeRate: feeRate.value,
-    initialRates: fxRates.value,
+const { calculateFee, convert } = useFx({
+    feeRate,
+    rates: fxList,
 })
+
+const { gotoRoute } = useUtils()
 
 const router = useRouter()
 
@@ -65,10 +66,13 @@ const selectedWallet = computed(() =>
 )
 
 const fee = computed(() => payment.value.amount ? calculateFee(payment.value.amount) : 0)
-const totalDebit = computed(() => Number(payment.value.amount || 0) + fee.value)
+const totalAmount = computed(() =>
+    Number(payment.value.amount || 0) + Number(fee.value)
+)
+
 
 const hasSufficientBalance = computed(() =>
-    selectedWallet.value ? totalDebit.value <= selectedWallet.value.amount : false
+    selectedWallet.value ? totalAmount.value <= selectedWallet.value.amount : false
 )
 
 // ------------------------
@@ -77,7 +81,7 @@ const hasSufficientBalance = computed(() =>
 const validate = () => {
     const amount = Number(payment.value.amount || 0)
     const walletBalance = selectedWallet.value?.amount || 0
-    const total = amount + fee.value
+    const total = totalAmount.value
 
     errors.value = {
         beneficiary: touched.value.beneficiary && !payment.value.beneficiary
@@ -104,19 +108,25 @@ const validate = () => {
 
 watch(payment, validate, { deep: true })
 
+
 // ------------------------
 // FX Computed
 // ------------------------
-const fxRate = computed(() =>
-    payment.value.sourceCurrency &&
-        payment.value.destinationCurrency &&
-        payment.value.sourceCurrency !== payment.value.destinationCurrency
-        ? getRate(payment.value.sourceCurrency, payment.value.destinationCurrency)
-        : null
-)
+const fxRate = computed(() => {
+    const { sourceCurrency, destinationCurrency } = payment.value
+    if (!sourceCurrency || !destinationCurrency) return null
+    return fxStore.getExchangeRate(sourceCurrency, destinationCurrency)
+})
+
 
 const convertedAmount = computed(() =>
-    fxRate.value ? convert(payment.value.amount, payment.value.sourceCurrency, payment.value.destinationCurrency) : 0
+    payment.value.amount > 0 && fxRate.value
+        ? convert(
+            Number(payment.value.amount),
+            payment.value.sourceCurrency,
+            payment.value.destinationCurrency
+        )
+        : 0
 )
 
 // ------------------------
@@ -178,25 +188,36 @@ const makePayment = async () => {
         // Wait a moment so user sees the toast
         await new Promise(resolve => setTimeout(resolve, 1800))
 
-        router.push('/transactions')
+        gotoRoute('/transactions')
 
         // Reset form
         payment.value = {
             beneficiary: '',
             amount: '',
             sourceCurrency: wallets.value[0]?.currency || '',
-            destinationCurrency: currencyStore.currencyOptions.find(c => c.value !== wallets.value[0]?.currency)?.value || ''
+            destinationCurrency: fxList.value.find(c => c.value !== wallets.value[0]?.currency)?.value || ''
         }
         Object.keys(touched.value).forEach(k => (touched.value[k] = false))
 
     } catch (err) {
-        console.error(err)
         toastRef.value?.addToast(paymentStore.error || 'Payment failed. Please try again.', 'error')
     } finally {
         loading.value = false
         showConfirmModal.value = false
     }
 }
+
+
+watch(
+    () => payment.value.sourceCurrency,
+    (newCurrency) => {
+        if (payment.value.destinationCurrency === newCurrency) {
+            payment.value.destinationCurrency =
+                fxList.value.find(c => c.value !== newCurrency)?.value || ''
+        }
+    }
+)
+
 
 // ------------------------
 // Init
@@ -205,8 +226,7 @@ onMounted(async () => {
     try {
         await Promise.all([
             walletStore.fetchWallets(),
-            currencyStore.fetchCurrencies(),
-            fxStore.fetchRates(),
+            fxStore.fetchFx(),
         ])
 
         if (!wallets.value.length) {
@@ -216,9 +236,8 @@ onMounted(async () => {
 
         payment.value.sourceCurrency = wallets.value[0].currency
         payment.value.destinationCurrency =
-            currencyStore.currencyOptions.find(c => c.value !== wallets.value[0].currency)?.value || ''
+            fxList.value.find(c => c.value !== wallets.value[0].currency)?.value || ''
     } catch (err) {
-        console.error(err)
         toastRef.value?.addToast('Failed to load payment data', 'error')
     }
 })
@@ -244,9 +263,9 @@ onMounted(async () => {
                         :loading="walletsLoading" :error="errors.sourceCurrency"
                         @change="touched.sourceCurrency = true" />
 
-                    <BaseSelect label="Destination Currency" v-model="payment.destinationCurrency"
-                        :options="currencyStore.currencyOptions" :loading="currencyStore.loading"
-                        :error="errors.destinationCurrency" @change="touched.destinationCurrency = true" />
+                    <BaseSelect label="Destination Currency" v-model="payment.destinationCurrency" :options="fxList"
+                        :loading="fxLoading" :error="errors.destinationCurrency"
+                        @change="touched.destinationCurrency = true" />
                 </div>
 
                 <!-- FX Breakdown -->
@@ -268,7 +287,7 @@ onMounted(async () => {
                     <div class="flex justify-between">
                         <span class="text-gray-500">Total</span>
                         <span class="font-medium">
-                            {{ totalDebit.toFixed(2) }} {{ payment.sourceCurrency }}
+                            {{ totalAmount.toFixed(2) }} {{ payment.sourceCurrency }}
                         </span>
                     </div>
 

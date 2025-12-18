@@ -82,7 +82,7 @@ const login = async () => {
             router.push('/dashboard')
         }
     } catch (err) {
-        console.error(err)
+        errors.value.email = err
     } finally {
         loading.value = false
     }

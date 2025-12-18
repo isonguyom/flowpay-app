@@ -1,12 +1,20 @@
+# Use Node LTS
 FROM node:20-alpine
 
-WORKDIR /app
+# Set working directory
+WORKDIR /usr/src/app
 
+# Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
 
+# Copy the rest of the frontend code
 COPY . .
 
-EXPOSE 5173
+# Expose port for Vite dev server
+EXPOSE 3000
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Run dev server
+CMD ["npm", "run", "dev"]

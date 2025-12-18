@@ -15,15 +15,21 @@ import TotalWalletBalanceCard from '@/components/cards/TotalWalletBalanceCard.vu
 
 import { useTransactionStore } from '@/stores/transactions'
 import { useWalletStore } from '@/stores/wallets'
+import { useUserStore } from '@/stores/user'
 import { useFundingAccountsStore } from '@/stores/fundingAccounts'
 import { useUtils } from '@/composables/useUtils'
+import { storeToRefs } from 'pinia'
+import FxChart from '@/components/charts/FxChart.vue'
 
 // ------------------------
 // Stores & Utils
 // ------------------------
 const transactionStore = useTransactionStore()
 const walletStore = useWalletStore()
+const userStore = useUserStore()
 const fundingAccountsStore = useFundingAccountsStore()
+
+const { profile } = storeToRefs(userStore)
 const { gotoRoute } = useUtils()
 
 // ------------------------
@@ -231,6 +237,7 @@ const confirmWithdraw = async () => {
 // Lifecycle
 // ------------------------
 onMounted(() => {
+    userStore.fetchProfile()
     walletStore.fetchWallets()
     transactionStore.fetchTransactions()
     fundingAccountsStore.fetchFundingAccounts()
@@ -242,8 +249,8 @@ onMounted(() => {
         <div class="space-y-8">
 
             <!-- Total Balance -->
-            <TotalWalletBalanceCard :totalBalance="totalBalance" @createWallet="gotoRoute('/wallets/create')"
-                @makePayment="gotoRoute('/payment')" />
+            <TotalWalletBalanceCard :totalBalance="totalBalance" :defaultCurrency="profile.defaultCurrency"
+                @createWallet="gotoRoute('/wallets/create')" @makePayment="gotoRoute('/payment')" />
 
             <!-- Wallets -->
             <section>
@@ -260,6 +267,11 @@ onMounted(() => {
                     </template>
                 </ApiSkeleton>
             </section>
+
+
+            <FxChart />
+
+
 
             <!-- Recent Transactions -->
             <section>
