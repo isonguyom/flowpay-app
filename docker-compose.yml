@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   # --------------------
   # MongoDB
@@ -16,6 +18,11 @@ services:
       - mongo_data:/data/db
     networks:
       - flowpay-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # --------------------
   # Backend
@@ -37,6 +44,17 @@ services:
     volumes:
       - ./backend:/app
     command: sh -c "npm install && npm run dev"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # --------------------
   # Frontend
@@ -58,6 +76,11 @@ services:
     volumes:
       - ./frontend:/app
     command: sh -c "npm install && npm run dev"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 # --------------------
 # Volumes
@@ -65,9 +88,9 @@ services:
 volumes:
   mongo_data:
 
-# --------------------
-# Network
-# --------------------
+    # --------------------
+    # Network
+    # --------------------
 networks:
   flowpay-network:
     driver: bridge
