@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",

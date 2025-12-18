@@ -1,5 +1,7 @@
-import api from './api'
+import axios from 'axios'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 export const getHealth = () => {
-  return api.get('/health')
+  return axios.get(`${API_URL}/health`)
 }
