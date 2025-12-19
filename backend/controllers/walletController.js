@@ -1,143 +1,140 @@
 import Wallet from '../models/Wallet.js'
 import Transaction from '../models/Transaction.js'
+import { getSocket } from '../services/socket.js'
 
-
-// @desc    Get all wallets for the authenticated user
-// @route   GET /api/wallets
-// @access  Private
-export const getWallets = async (req, res) => {
-    try {
-        const wallets = await Wallet.find({ user: req.user._id })
-        res.json({ wallets })
-    } catch (err) {
-        console.error(err)
-        res.status(500).json({ message: 'Server error' })
-    }
-}
-
+// --------------------
+// Create a new wallet
+// --------------------
 export const createWallet = async (req, res) => {
     try {
-        console.log('Create wallet request body:', req.body)
-        console.log('Authenticated user:', req.user)
-
-        const { currency, amount } = req.body
+        const userId = req.user._id
+        const { currency } = req.body
 
         if (!currency) {
             return res.status(400).json({ message: 'Currency is required' })
         }
 
-        const existing = await Wallet.findOne({ user: req.user.id, currency })
-        if (existing) {
-            return res.status(400).json({ message: `Wallet for ${currency} already exists` })
+        const existingWallet = await Wallet.findOne({ user: userId, currency })
+        if (existingWallet) {
+            return res.status(409).json({ message: `Wallet for ${currency} already exists` })
         }
 
-        const wallet = await Wallet.create({
-            user: req.user.id,
-            currency,
-            amount: amount || 0,
-            status: 'Active',
-        })
+        const wallet = await Wallet.create({ user: userId, currency })
+        res.status(201).json({ message: 'Wallet created successfully', wallet })
 
-        res.status(201).json({ wallet })
+        // Emit WebSocket update
+        getSocket()?.to(userId.toString()).emit('walletCreated', wallet)
     } catch (err) {
-        console.error('Create wallet error:', err)
+        console.error(err)
         res.status(500).json({ message: 'Failed to create wallet' })
     }
 }
 
-
-
-// @desc    Fund a wallet
-// @route   PATCH /api/wallets/:walletId/fund
-// @access  Private
-export const fundWallet = async (req, res) => {
-    const { amount, fundingAccount } = req.body
-    const { walletId } = req.params
-
-    if (!amount || amount <= 0) {
-        return res.status(400).json({ message: 'Invalid amount' })
-    }
-
+// --------------------
+// Get all wallets for user
+// --------------------
+export const getWallets = async (req, res) => {
     try {
-        const wallet = await Wallet.findOne({
-            _id: walletId,
-            user: req.user._id,
-        })
+        const wallets = await Wallet.find({ user: req.user._id }).sort({ createdAt: 1 })
+        res.json({ wallets })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ message: 'Failed to fetch wallets' })
+    }
+}
 
-        if (!wallet) {
-            return res.status(404).json({ message: 'Wallet not found' })
+// --------------------
+// Fund wallet
+// --------------------
+export const fundWallet = async (req, res) => {
+    try {
+        const userId = req.user._id
+        const { walletId, amount } = req.body
+
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ message: 'Invalid amount' })
         }
 
-        // 1️⃣ Update wallet balance
+        const wallet = await Wallet.findOne({ _id: walletId, user: userId })
+        if (!wallet) return res.status(404).json({ message: 'Wallet not found' })
+        if (wallet.status !== 'Active') return res.status(403).json({ message: 'Wallet is not active' })
+
+        // Add amount
         wallet.amount += amount
         await wallet.save()
 
-        // 2️⃣ Create transaction
+        // Create transaction
         const transaction = await Transaction.create({
-            user: req.user._id,
+            user: userId,
             type: 'FUND',
             amount,
             sourceCurrency: wallet.currency,
             destinationCurrency: wallet.currency,
-            fundingAccount: fundingAccount || 'External Account',
-            settlementAmount: amount,
-            status: 'Completed',
+            status: 'Pending',
         })
 
-        res.json({ wallet, transaction })
+        // Simulate webhook to complete transaction after 2 seconds
+        setTimeout(async () => {
+            transaction.status = 'Completed'
+            await transaction.save()
+
+            // Emit Socket event for transaction update
+            getSocket()?.to(userId.toString()).emit('transactionCreated', transaction)
+        }, 2000)
+
+        res.json({ message: 'Wallet funded successfully', wallet })
+        getSocket()?.to(userId.toString()).emit('walletUpdated', wallet)
     } catch (err) {
-        console.error('Fund wallet error:', err)
-        res.status(500).json({ message: 'Server error' })
+        console.error(err)
+        res.status(500).json({ message: 'Failed to fund wallet' })
     }
 }
 
-
-
-// @desc    Withdraw from a wallet
-// @route   PATCH /api/wallets/:walletId/withdraw
-// @access  Private
-export const withdrawWallet = async (req, res) => {
-    const { amount, recipient } = req.body
-    const { walletId } = req.params
-
-    if (!amount || amount <= 0) {
-        return res.status(400).json({ message: 'Invalid amount' })
-    }
-
+// --------------------
+// Withdraw from wallet
+// --------------------
+export const withdrawFromWallet = async (req, res) => {
     try {
-        const wallet = await Wallet.findOne({
-            _id: walletId,
-            user: req.user._id,
-        })
+        const userId = req.user._id
+        const { walletId, amount, recipient } = req.body
 
-        if (!wallet) {
-            return res.status(404).json({ message: 'Wallet not found' })
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ message: 'Invalid amount' })
         }
 
-        if (wallet.amount < amount) {
-            return res.status(400).json({ message: 'Insufficient balance' })
-        }
+        const wallet = await Wallet.findOne({ _id: walletId, user: userId })
+        if (!wallet) return res.status(404).json({ message: 'Wallet not found' })
+        if (wallet.status !== 'Active') return res.status(403).json({ message: 'Wallet is not active' })
+        if (wallet.amount < amount) return res.status(400).json({ message: 'Insufficient wallet balance' })
 
-        // 1️⃣ Deduct balance
+        // Deduct amount
         wallet.amount -= amount
         await wallet.save()
 
-        // 2️⃣ Create transaction
+        // Create transaction
         const transaction = await Transaction.create({
-            user: req.user._id,
+            user: userId,
             type: 'WITHDRAW',
             amount,
             sourceCurrency: wallet.currency,
             destinationCurrency: wallet.currency,
-            recipient: recipient || 'External Recipient',
-            settlementAmount: amount,
-            status: 'Completed',
+            recipient,
+            status: 'Pending',
         })
 
-        res.json({ wallet, transaction })
+        // Simulate webhook to complete transaction after 2 seconds
+        setTimeout(async () => {
+            transaction.status = 'Completed'
+            await transaction.save()
+
+            // Emit Socket event for transaction update
+            getSocket()?.to(userId.toString()).emit('transactionCreated', transaction)
+        }, 2000)
+
+        res.json({ message: 'Withdrawal successful', wallet })
+        getSocket()?.to(userId.toString()).emit('walletUpdated', wallet)
     } catch (err) {
-        console.error('Withdraw wallet error:', err)
-        res.status(500).json({ message: 'Server error' })
+        console.error(err)
+        res.status(500).json({ message: 'Failed to withdraw from wallet' })
     }
 }
-

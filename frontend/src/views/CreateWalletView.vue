@@ -4,20 +4,19 @@ import { storeToRefs } from 'pinia'
 
 import AppLayout from '@/layouts/AppLayout.vue'
 import BaseInput from '@/components/utilities/BaseInput.vue'
-import BaseButton from '@/components/utilities/BaseButton.vue'
 import BaseSelect from '@/components/utilities/BaseSelect.vue'
+import BaseButton from '@/components/utilities/BaseButton.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import ConfirmModal from '@/components/utilities/ConfirmModal.vue'
 import BaseToast from '@/components/utilities/BaseToast.vue'
 
 import { useWalletStore } from '@/stores/wallets'
 import { useFxStore } from '@/stores/fx'
+import { useUtils } from '@/composables/useUtils'
 
-// ------------------------
-// Stores
-// ------------------------
 const walletStore = useWalletStore()
 const fxStore = useFxStore()
+const { gotoRoute } = useUtils()
 
 const { fxList, loading: fxLoading } = storeToRefs(fxStore)
 
@@ -46,25 +45,20 @@ const errors = ref({
 // ------------------------
 const validate = () => {
     errors.value.currency =
-        touched.value.currency && !wallet.value.currency
-            ? 'Select a currency'
-            : null
+        touched.value.currency && !wallet.value.currency ? 'Select a currency' : null
 }
 
-// ------------------------
-// Form Validity
-// ------------------------
-const isFormValid = computed(() => wallet.value.currency)
+const isFormValid = computed(() => !!wallet.value.currency)
 
 // ------------------------
-// Submit Handlers
+// Handlers
 // ------------------------
 const confirmCreateWallet = () => {
     touched.value.currency = true
     validate()
 
     if (!isFormValid.value) {
-        toastRef.value.addToast('Please select a currency', 'error')
+        toastRef.value?.addToast('Please select a currency', 'error')
         return
     }
 
@@ -78,19 +72,24 @@ const createWallet = async () => {
     try {
         await walletStore.createWallet({
             currency: wallet.value.currency,
-            amount: 0, // always 0
+            amount: 0,
         })
 
-        toastRef.value.addToast(
+        toastRef.value?.addToast(
             `Wallet for ${wallet.value.currency} created successfully!`,
             'success'
         )
 
+        // Wait a short time for user to see the toast, then redirect
+        setTimeout(() => {
+            gotoRoute('/dashboard')
+        }, 1200)
+
         // Reset form
-        wallet.value.currency = fxList[0]?.value || ''
+        wallet.value.currency = fxList.value[0]?.value || ''
         touched.value.currency = false
     } catch (err) {
-        toastRef.value.addToast(walletStore.error || 'Failed to create wallet', 'error')
+        toastRef.value?.addToast(walletStore.error || 'Failed to create wallet', 'error')
     } finally {
         loading.value = false
     }
@@ -101,7 +100,7 @@ const createWallet = async () => {
 // ------------------------
 onMounted(async () => {
     await fxStore.fetchFx()
-    wallet.value.currency = fxList[0]?.value || ''
+    wallet.value.currency = fxList.value[0]?.value || ''
 })
 </script>
 
@@ -115,14 +114,13 @@ onMounted(async () => {
                     :error="errors.currency" @change="touched.currency = true" />
 
                 <BaseInput label="Initial Amount" type="number" placeholder="0.00" v-model="wallet.initialAmount"
-                    :readonly="true" :error="null" :disabled="true" :max="'0'" min="0" />
+                    readonly disabled />
 
                 <BaseButton type="submit" fullWidth :disabled="!isFormValid || loading" :loading="loading">
                     Create Wallet
                 </BaseButton>
             </form>
 
-            <!-- Confirmation Modal -->
             <ConfirmModal :show="showConfirmModal" title="Confirm Wallet Creation" :loading="loading"
                 @close="showConfirmModal = false" @confirm="createWallet">
                 <p>
@@ -133,7 +131,6 @@ onMounted(async () => {
                 </p>
             </ConfirmModal>
 
-            <!-- Toast -->
             <BaseToast ref="toastRef" />
         </div>
     </AppLayout>

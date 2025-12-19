@@ -1,10 +1,14 @@
-// routes/webhook.js
-import express from 'express'
-import { handleFlowpayWebhook } from '../controllers/webhookController.js'
+import express from 'express';
+import bodyParser from 'body-parser';
+import { handleStripeWebhook } from '../controllers/webhookController.js';
 
-const router = express.Router()
+const router = express.Router();
 
-// Webhook endpoint (public, but secured via signature)
-router.post('/flowpay', handleFlowpayWebhook)
+// Stripe requires raw body for signature verification
+router.post(
+    '/stripe',
+    bodyParser.raw({ type: 'application/json' }),
+    handleStripeWebhook
+);
 
-export default router
+export default router;

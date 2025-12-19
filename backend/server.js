@@ -1,66 +1,80 @@
-import dotenv from 'dotenv'
-dotenv.config()
+import dotenv from 'dotenv';
+dotenv.config();
 
-import express from 'express'
-import mongoose from 'mongoose'
-import cors from 'cors'
-import morgan from 'morgan' 
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import morgan from 'morgan';
+import { createServer } from 'http';
 
-import authRoutes from './routes/auth.js'
-import paymentRoutes from './routes/payments.js'
-import transactionRoutes from './routes/transactions.js'
-import walletRoutes from './routes/wallets.js'
-import fxRoutes from './routes/fx.js'
-import webhookRoutes from './routes/webhook.js'
+import authRoutes from './routes/auth.js';
+import paymentRoutes from './routes/payments.js';
+import transactionRoutes from './routes/transactions.js';
+import walletRoutes from './routes/wallets.js';
+import fxRoutes from './routes/fx.js';
+import webhookRoutes from './routes/webhook.js';
+import socketTestRoutes from './routes/socketTest.js'
 
-const app = express()
-const PORT = process.env.PORT || 8000
+import { initSocket } from './services/socket.js';
 
-// ✅ Environment check
-if (process.env.NODE_ENV !== 'production') {
-    console.log('Dev mode enabled')
-}
+const app = express();
+const PORT = process.env.PORT || 8000;
 
-// ---------------- Logging ----------------
-app.use(morgan('combined')) // logs HTTP requests
+// -------------------- HTTP + WebSocket Setup --------------------
+const server = createServer(app);
 
+// Initialize Socket.IO via the socket service
+const io = initSocket(server);
 
-// ---------------- Middleware ----------------
+// Make io accessible in routes if needed
+app.set('io', io);
+
+// -------------------- Middleware --------------------
+app.use(morgan('combined'));
+
 app.use(cors({
     origin: [
-        'http://localhost:5173',        // local dev
+        'http://localhost:5173',
         'http://frontend:5173',
-        'https://flowpayapp.vercel.app' // production
+        'https://flowpayapp.vercel.app'
     ],
     credentials: true
-}))
+}));
 
-app.use(express.json())
+// Webhook route should come before JSON parser if raw body is needed
+app.use('/api/webhooks', webhookRoutes);
+
+app.use(express.json());
+
+// -------------------- API Routes --------------------
+app.use('/api/auth', authRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/wallets', walletRoutes);
+app.use('/api/fx', fxRoutes);
+
+// -------------------- Health Check --------------------
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.use('/api/test-socket', socketTestRoutes)
 
 
-// ---------------- Routes ----------------
-app.use('/api/auth', authRoutes)
-app.use('/api/payments', paymentRoutes)
-app.use('/api/transactions', transactionRoutes)
-app.use('/api/wallets', walletRoutes)
-app.use('/api/fx', fxRoutes)
-app.use('/api/webhooks', webhookRoutes)
+// -------------------- MongoDB Connection --------------------
+if (!process.env.MONGO_URI) {
+    console.error('MONGO_URI is not defined in .env');
+    process.exit(1);
+}
 
-// ---------------- Test route ----------------
-app.get("/health", (req, res) => {
-    res.json({ status: "ok" });
-});
-
-// ---------------- MongoDB connection ----------------
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err))
+    .catch(err => console.error('MongoDB connection error:', err));
 
-// ---------------- Error handling ----------------
+// -------------------- Error Handling --------------------
 app.use((err, req, res, next) => {
-    console.error(err.stack) // logs to Docker
-    res.status(500).json({ message: 'Internal server error', error: err.message })
-})
+    console.error(err.stack);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
+});
 
-// ---------------- Start server ----------------
-app.listen(PORT, () => console.log(`Server running on port http://localhost:${PORT}`))
+// -------------------- Start Server --------------------
+server.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});

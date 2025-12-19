@@ -1,9 +1,12 @@
-// stores/wallet.js
+// stores/wallets.js
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { useHelpers } from '@/composables/useHelpers'
 
 export const useWalletStore = defineStore('wallets', () => {
+    const { simulateDelay } = useHelpers()
+
     // ------------------------
     // State
     // ------------------------
@@ -28,13 +31,12 @@ export const useWalletStore = defineStore('wallets', () => {
         }
     }
 
-    const createWallet = async ({ currency, amount = 0 }) => {
+    const createWallet = async ({ currency }) => {
         loading.value = true
         error.value = null
         try {
-            // if currency is an object, pick its value
             const currencyValue = typeof currency === 'object' ? currency.value : currency
-            const res = await api.post('/wallets', { currency: currencyValue, amount })
+            const res = await api.post('/wallets', { currency: currencyValue })
             wallets.value.push(res.data.wallet)
             return res.data.wallet
         } catch (err) {
@@ -46,15 +48,35 @@ export const useWalletStore = defineStore('wallets', () => {
         }
     }
 
+    // ------------------------
+    // Fund wallet
+    // ------------------------
     const fundWallet = async (walletId, amount) => {
         loading.value = true
         error.value = null
         try {
-            const res = await api.patch(`/wallets/${walletId}/fund`, { amount })
-            const index = wallets.value.findIndex(w => w._id === walletId)
-            if (index !== -1) {
-                wallets.value[index].amount = res.data.wallet.amount
-            }
+            // send the wallet _id
+            const res = await api.post('/wallets/fund', { walletId, amount })
+
+            // simulate webhook: mark transaction as completed after 2s
+            setTimeout(async () => {
+                try {
+                    await api.post('/wallets/webhook', {
+                        transactionId: res.data.transaction._id,
+                        type: 'FUND',
+                        status: 'Completed'
+                    })
+
+                    // update local wallet balance
+                    const index = wallets.value.findIndex(w => w._id === walletId)
+                    if (index !== -1) {
+                        wallets.value[index].amount = res.data.wallet.amount
+                    }
+                } catch (err) {
+                    console.error('Webhook simulation failed:', err)
+                }
+            }, 2000)
+
             return res.data.wallet
         } catch (err) {
             console.error('Fund wallet error:', err.response?.data || err)
@@ -65,15 +87,35 @@ export const useWalletStore = defineStore('wallets', () => {
         }
     }
 
+    // ------------------------
+    // Withdraw wallet
+    // ------------------------
     const withdrawWallet = async (walletId, amount) => {
         loading.value = true
         error.value = null
         try {
-            const res = await api.patch(`/wallets/${walletId}/withdraw`, { amount })
-            const index = wallets.value.findIndex(w => w._id === walletId)
-            if (index !== -1) {
-                wallets.value[index].amount = res.data.wallet.amount
-            }
+            // send the wallet _id
+            const res = await api.post('/wallets/withdraw', { walletId, amount })
+
+            // simulate webhook: mark transaction as completed after 2s
+            setTimeout(async () => {
+                try {
+                    await api.post('/wallets/webhook', {
+                        transactionId: res.data.transaction._id,
+                        type: 'WITHDRAW',
+                        status: 'Completed'
+                    })
+
+                    // update local wallet balance
+                    const index = wallets.value.findIndex(w => w._id === walletId)
+                    if (index !== -1) {
+                        wallets.value[index].amount = res.data.wallet.amount
+                    }
+                } catch (err) {
+                    console.error('Webhook simulation failed:', err)
+                }
+            }, 2000)
+
             return res.data.wallet
         } catch (err) {
             console.error('Withdraw wallet error:', err.response?.data || err)

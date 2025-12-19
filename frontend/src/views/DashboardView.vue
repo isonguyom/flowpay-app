@@ -9,27 +9,27 @@ import BaseSelect from '@/components/utilities/BaseSelect.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
 import BaseToast from '@/components/utilities/BaseToast.vue'
 
-import TransactionsGrid from '@/components/ui/TransactionsGrid.vue'
 import WalletCard from '@/components/cards/WalletCard.vue'
 import TotalWalletBalanceCard from '@/components/cards/TotalWalletBalanceCard.vue'
 
 import { useTransactionStore } from '@/stores/transactions'
 import { useWalletStore } from '@/stores/wallets'
-import { useUserStore } from '@/stores/user'
+import { useAuthStore } from '@/stores/auth'
 import { useFundingAccountsStore } from '@/stores/fundingAccounts'
 import { useUtils } from '@/composables/useUtils'
 import { storeToRefs } from 'pinia'
 import FxChart from '@/components/charts/FxChart.vue'
+import TransactionsList from '@/components/TransactionsList.vue'
 
 // ------------------------
 // Stores & Utils
 // ------------------------
 const transactionStore = useTransactionStore()
 const walletStore = useWalletStore()
-const userStore = useUserStore()
+const authStore = useAuthStore()
 const fundingAccountsStore = useFundingAccountsStore()
 
-const { profile } = storeToRefs(userStore)
+const { user } = storeToRefs(authStore)
 const { gotoRoute } = useUtils()
 
 // ------------------------
@@ -46,6 +46,7 @@ const showWithdrawModal = ref(false)
 const selectedWallet = ref(null)
 const submitting = ref(false)
 const toastRef = ref(null)
+const transactionsListRef = ref(null)
 
 // ------------------------
 // Forms
@@ -237,7 +238,7 @@ const confirmWithdraw = async () => {
 // Lifecycle
 // ------------------------
 onMounted(() => {
-    userStore.fetchProfile()
+    authStore.fetchMe()
     walletStore.fetchWallets()
     transactionStore.fetchTransactions()
     fundingAccountsStore.fetchFundingAccounts()
@@ -249,13 +250,13 @@ onMounted(() => {
         <div class="space-y-8">
 
             <!-- Total Balance -->
-            <TotalWalletBalanceCard :totalBalance="totalBalance" :defaultCurrency="profile.defaultCurrency"
+            <TotalWalletBalanceCard :totalBalance="totalBalance" :defaultCurrency="user?.defaultCurrency"
                 @createWallet="gotoRoute('/wallets/create')" @makePayment="gotoRoute('/payment')" />
 
             <!-- Wallets -->
             <section>
                 <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
-                    Funding Wallets
+                    Payment Wallets
                 </h3>
 
                 <ApiSkeleton :loading="walletStore.loading" :error="walletStore.error" :items="walletStore.wallets">
@@ -279,12 +280,13 @@ onMounted(() => {
                     <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">
                         Recent Transactions
                     </h3>
-                    <BaseButton variant="ghost" size="sm" @click="gotoRoute('/transactions')">
+                    <BaseButton v-if="transactionsListRef?.transactions.length > 0" variant="ghost" size="sm"
+                        @click="gotoRoute('/transactions')">
                         View all
                     </BaseButton>
                 </div>
 
-                <TransactionsGrid :transactions="transactionStore.transactions" />
+                <TransactionsList ref="transactionsListRef" />
             </section>
 
             <!-- Fund Modal -->

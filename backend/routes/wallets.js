@@ -1,16 +1,52 @@
 import express from 'express'
-import { getWallets, fundWallet, withdrawWallet, createWallet } from '../controllers/walletController.js'
-import { protect } from '../middleware/auth.js'
+import {
+    createWallet,
+    getWallets,
+    fundWallet,
+    withdrawFromWallet
+} from '../controllers/walletController.js'
+
+import { protect } from '../middlewares/auth.js'
+import { idempotencyMiddleware } from '../middlewares/idempotency.js'
+import { walletRateLimiter, walletThrottle } from '../limiters/walletRateLimit.js' // Create these if needed
 
 const router = express.Router()
 
-router.use(protect) // all routes are protected
+// --------------------
+// Wallet routes
+// --------------------
 
-router.get('/', getWallets)
-router.post('/', createWallet)          // create a new wallet
-router.patch('/:walletId/fund', fundWallet)      // Fund a specific wallet
-router.patch('/:walletId/withdraw', withdrawWallet) // Withdraw from a specific wallet
+// Get all wallets for authenticated user
+router.get('/', protect, getWallets)
 
+// Create a wallet (idempotent to prevent duplicates)
+router.post(
+    '/',
+    protect,
+    idempotencyMiddleware,
+    walletRateLimiter,
+    walletThrottle,
+    createWallet
+)
+
+// Fund wallet
+router.post(
+    '/fund',
+    protect,
+    idempotencyMiddleware,
+    walletRateLimiter,
+    walletThrottle,
+    fundWallet
+)
+
+// Withdraw from wallet
+router.post(
+    '/withdraw',
+    protect,
+    idempotencyMiddleware,
+    walletRateLimiter,
+    walletThrottle,
+    withdrawFromWallet
+)
 
 export default router
-

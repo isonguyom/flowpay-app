@@ -3,11 +3,12 @@ import { ref, watch } from 'vue'
 import BaseInput from '@/components/utilities/BaseInput.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
-const router = useRouter()
+import { useUtils } from '@/composables/useUtils'
+
 const authStore = useAuthStore()
+const { gotoRoute } = useUtils()
 
 let nameTimeout, emailTimeout, passwordTimeout
 const loading = ref(false)
@@ -76,7 +77,7 @@ const register = async () => {
         const success = await authStore.register(form.value.name, form.value.email, form.value.password)
 
         if (success) {
-            router.push('/dashboard') // Only redirect if registration was successful
+            gotoRoute('/dashboard') // Only redirect if registration was successful
         }
     } catch (err) {
         errors.value.email

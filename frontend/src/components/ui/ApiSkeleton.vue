@@ -37,12 +37,9 @@ const props = defineProps({
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="!items.length" class="flex flex-col items-center justify-center py-16 text-gray-400 space-y-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 17v-4h6v4m-6 0V9h6v8M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+        <div v-else-if="!items.length"
+            class="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500 space-y-2 h-auto min-h-80 w-full">
+            <i class="bi bi-trash text-4xl"></i>
             <p class="text-sm md:text-base font-medium">{{ empty }}</p>
         </div>
 

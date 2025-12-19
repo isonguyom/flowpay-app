@@ -6,9 +6,11 @@ import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useUtils } from '@/composables/useUtils'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { gotoRoute } = useUtils()
 
 let emailTimeout
 let passwordTimeout
@@ -79,7 +81,7 @@ const login = async () => {
 
         if (success) {
             // Only redirect if login was successful
-            router.push('/dashboard')
+            gotoRoute('/dashboard')
         }
     } catch (err) {
         errors.value.email = err
