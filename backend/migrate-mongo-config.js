@@ -3,11 +3,10 @@
 const config = {
   mongodb: {
     // TODO Change (or review) the url to your MongoDB:
-    url: process.env.MONGO_URI,
+    url: "mongodb://localhost:27017",
 
     // TODO Change this to your database name:
-    databaseName: process.env.MONGO_DB_NAME,
-
+    databaseName: "YOURDATABASENAME",
 
     options: {
       // useNewUrlParser: true, // (not needed anymore in mongodb driver 4.x+)
@@ -40,4 +39,4 @@ const config = {
   moduleSystem: 'commonjs',
 };
 
-module.exports = config;
+export default config;

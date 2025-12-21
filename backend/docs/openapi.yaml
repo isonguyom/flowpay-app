@@ -1,0 +1,443 @@
+openapi: 3.0.3
+info:
+  title: FlowPay API
+  version: 1.0.0
+  description: REST API for FlowPay cross-border wallet and payment platform
+servers:
+  - url: https://flowpay-app.onrender.com/
+    description: Production server
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: Authentication
+  - name: Wallets
+  - name: Payments
+  - name: Transactions
+  - name: FX
+  - name: Webhooks
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201':
+          description: User created successfully
+        '400':
+          description: Invalid input
+
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login successful, returns JWT token
+        '401':
+          description: Invalid credentials
+
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+    put:
+      tags: [Authentication]
+      summary: Update current user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User profile updated successfully
+        '400':
+          description: Invalid input
+
+  /api/wallets:
+    get:
+      tags: [Wallets]
+      summary: List user wallets
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Array of wallets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Wallet'
+
+    post:
+      tags: [Wallets]
+      summary: Create a new wallet
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalletCreate'
+      responses:
+        '201':
+          description: Wallet created successfully
+
+  /api/wallets/fund:
+    post:
+      tags: [Wallets]
+      summary: Fund a wallet
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Idempotency-Key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalletFundWithdraw'
+      responses:
+        '200':
+          description: Wallet funded successfully
+
+  /api/wallets/withdraw:
+    post:
+      tags: [Wallets]
+      summary: Withdraw from a wallet
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Idempotency-Key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalletFundWithdraw'
+      responses:
+        '200':
+          description: Wallet withdrawal successful
+
+  /api/payments:
+    post:
+      tags: [Payments]
+      summary: Initiate a payment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Idempotency-Key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreate'
+      responses:
+        '201':
+          description: Payment initiated successfully
+
+  /api/transactions:
+    get:
+      tags: [Transactions]
+      summary: List user transactions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Array of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  /api/fx/rates:
+    get:
+      tags: [FX]
+      summary: Get current FX rates
+      responses:
+        '200':
+          description: List of FX rates
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: number
+
+  /api/webhooks/stripe:
+    post:
+      tags: [Webhooks]
+      summary: Receive Stripe payment webhook events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhook'
+      responses:
+        '200':
+          description: Webhook received successfully
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Idempotency-Key:
+      name: Idempotency-Key
+      in: header
+      description: Unique key to prevent duplicate processing of the same request
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    UserRegister:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        defaultCurrency:
+          type: string
+          default: "USD"
+
+    UserLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        defaultCurrency:
+          type: string
+        role:
+          type: string
+        isActive:
+          type: boolean
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        defaultCurrency:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WalletCreate:
+      type: object
+      required:
+        - currency
+      properties:
+        currency:
+          type: string
+
+    WalletFundWithdraw:
+      type: object
+      required:
+        - walletId
+        - amount
+      properties:
+        walletId:
+          type: string
+        amount:
+          type: number
+
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        currency:
+          type: string
+        balance:
+          type: number
+        status:
+          type: string
+        isPrimary:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentCreate:
+      type: object
+      required:
+        - beneficiary
+        - amount
+        - sourceWalletId
+        - destinationCurrency
+      properties:
+        beneficiary:
+          type: string
+        amount:
+          type: number
+        sourceWalletId:
+          type: string
+        destinationCurrency:
+          type: string
+        fxRate:
+          type: number
+        fee:
+          type: number
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+        amount:
+          type: number
+        sourceCurrency:
+          type: string
+        destinationCurrency:
+          type: string
+        beneficiary:
+          type: string
+        fundingAccount:
+          type: string
+        fxRate:
+          type: number
+        fee:
+          type: number
+        settlementAmount:
+          type: number
+        paymentId:
+          type: string
+        walletId:
+          type: string
+        status:
+          type: string
+        reference:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentWebhook:
+      type: object
+      required:
+        - stripeId
+        - status
+      properties:
+        stripeId:
+          type: string
+        status:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    IdempotencyKey:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        userId:
+          type: string
+        endpoint:
+          type: string
+        response:
+          type: object
+        statusCode:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

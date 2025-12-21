@@ -5,7 +5,13 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import morgan from 'morgan';
+import path from 'path';
 import { createServer } from 'http';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 import authRoutes from './routes/auth.js';
 import paymentRoutes from './routes/payments.js';
@@ -14,11 +20,15 @@ import walletRoutes from './routes/wallets.js';
 import fxRoutes from './routes/fx.js';
 import webhookRoutes from './routes/webhook.js';
 import socketTestRoutes from './routes/socketTest.js'
+import { swaggerDocs } from './docs/swagger.js'
+import { connectDB } from './services/db.js';
+
 
 import { initSocket } from './services/socket.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
+
 
 // -------------------- HTTP + WebSocket Setup --------------------
 const server = createServer(app);
@@ -46,6 +56,14 @@ app.use('/api/webhooks', webhookRoutes);
 
 app.use(express.json());
 
+// Home route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'landing.html'));
+});
+
+// Register Swagger
+swaggerDocs(app)
+
 // -------------------- API Routes --------------------
 app.use('/api/auth', authRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -59,14 +77,7 @@ app.use('/api/test-socket', socketTestRoutes)
 
 
 // -------------------- MongoDB Connection --------------------
-if (!process.env.MONGO_URI) {
-    console.error('MONGO_URI is not defined in .env');
-    process.exit(1);
-}
-
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+await connectDB();
 
 // -------------------- Error Handling --------------------
 app.use((err, req, res, next) => {

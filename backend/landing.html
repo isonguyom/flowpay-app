@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowPay API</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #d1d1d1;
+            padding: 2em;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 20px;
+        }
+
+        a {
+            color: #0FB5BA;
+        }
+
+        a:hover {
+            opacity: 0.8;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: white;
+        }
+
+        main {
+            margin: 30px 0px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        div {
+            margin: 15px 0px;
+        }
+
+        .title {
+            color: #0FB5BA;
+            font-size: 2rem;
+        }
+    </style>
+</head>
+
+<body class="">
+
+    <header class="">
+        <div class="container mx-auto text-center">
+            <h1 class="title">FlowPay API</h1>
+            <p class="mt-2 text-lg">Secure cross-border wallet and payment platform</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto mt-10 px-4">
+        <section class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4">Getting Started</h2>
+            <p class="mb-4">Welcome to the FlowPay API. This API enables you to:</p>
+            <ul class="list-disc list-inside mb-4">
+                <li>Create and manage wallets</li>
+                <li>Fund and withdraw from wallets</li>
+                <li>Initiate and track payments</li>
+                <li>Retrieve transaction history</li>
+                <li>Fetch FX rates for supported currencies</li>
+            </ul>
+            <p class="mb-4">All requests require a valid JWT token for protected routes. Idempotency keys are supported
+                for safe retrying of financial requests.</p>
+            <a href="/docs"
+                class="inline-block bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 transition">View API
+                Documentation</a>
+        </section>
+
+        <section class="mt-8">
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-2">Authentication</h3>
+                    <p>Endpoints for user registration, login, and profile management:</p>
+                    <code class="block mt-2 bg-gray-100 p-2 rounded">POST /api/auth/register</code>
+                    <code class="block mt-1 bg-gray-100 p-2 rounded">POST /api/auth/login</code>
+                    <code class="block mt-1 bg-gray-100 p-2 rounded">GET /api/auth/me</code>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-2">Wallets & Payments</h3>
+                    <p>Endpoints for managing wallets and payments:</p>
+                    <code class="block mt-2 bg-gray-100 p-2 rounded">POST /api/wallets/fund</code>
+                    <code class="block mt-1 bg-gray-100 p-2 rounded">POST /api/wallets/withdraw</code>
+                    <code class="block mt-1 bg-gray-100 p-2 rounded">POST /api/payments</code>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-8 text-center text-gray-600">
+            <p>For full API details, visit the <a href="/docs" class="text-teal-600 hover:underline">OpenAPI/Swagger
+                    documentation</a>.</p>
+        </section>
+    </main>
+
+    <footer class="">
+        &copy; 2025 FlowPay. All rights reserved.
+    </footer>
+
+</body>
+
+</html>

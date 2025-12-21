@@ -4,6 +4,7 @@ FlowPay is a full-stack payment and wallet management platform that allows users
 
 The system supports:
 
+* Authentication with refresh tokens
 * Multi-currency wallets
 * Payments with fees and FX conversion
 * Transaction history
@@ -15,13 +16,14 @@ The system supports:
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 **Backend**
 
 * Node.js
 * Express.js
 * MongoDB (Mongoose)
+* JWT-based auth with refresh tokens
 * Stripe (Payments)
 * WebSockets(Socket.io)
 * Docker
@@ -29,7 +31,7 @@ The system supports:
 **Frontend**
 
 * Vue 3 (Composition API)
-* Pinia
+* Pinia Store
 * Tailwind CSS
 * Axios
 * Vue Router
@@ -105,5 +107,3 @@ To stop containers:
 ```bash
 docker-compose down
 ```
-
----
