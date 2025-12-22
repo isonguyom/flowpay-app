@@ -13,9 +13,3 @@ export const isNewPaymentFlowEnabled = (userId) => {
 };
 
 
-// config/featureFlags.js
-export const userFeatures = {
-    registrationEnabled: true, // set false to temporarily disable new user registrations
-    loginEnabled: true,
-    profileUpdateEnabled: true,
-}

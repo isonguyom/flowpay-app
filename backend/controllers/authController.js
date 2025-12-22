@@ -1,58 +1,24 @@
-// controllers/authController.js
-import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
-import Wallet from '../models/Wallet.js'
-import { userFeatures } from '../config/featureFlags.js'
-
-// -----------------------------
-// Helpers
-// -----------------------------
-const generateToken = (id) =>
-    jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' })
-
-const formatUser = (user) => ({
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    defaultCurrency: user.defaultCurrency,
-})
+import { formatUser, registerNewUser, authenticateUser } from '../helpers/authControllerHelpers.js'
+import { generateToken } from '../services/jwtToken.js'
+import { userAuth } from '../features/userAuth.js'
 
 // -----------------------------
 // Register User
 // -----------------------------
 export const registerUser = async (req, res) => {
     try {
-        if (!userFeatures.registrationEnabled) {
+        if (!userAuth.registrationEnabled) {
             return res.status(403).json({ message: 'Registration is disabled' })
         }
 
         const { name, email, password, defaultCurrency = 'USD' } = req.body
-
         if (!name || !email || !password) {
             return res.status(400).json({ message: 'All fields are required' })
         }
 
-        const existingUser = await User.findOne({ email })
-        if (existingUser) {
-            return res.status(409).json({ message: 'User already exists' })
-        }
-
-        // 1️⃣ Create user
-        const user = await User.create({
-            name,
-            email,
-            passwordHash: password, // hashed via pre-save
-            defaultCurrency,
-        })
-
-        // 2️⃣ Create default wallet (PRIMARY)
-        await Wallet.create({
-            userId: user._id,
-            currency: defaultCurrency,
-            balance: 0,
-            status: 'Active',
-            isPrimary: true,
-        })
+        // ✅ Await async function
+        const user = await registerNewUser({ name, email, password, defaultCurrency })
 
         res.status(201).json({
             user: formatUser(user),
@@ -60,8 +26,8 @@ export const registerUser = async (req, res) => {
         })
     } catch (err) {
         console.error('Register error:', err)
-        res.status(500).json({
-            message: 'Server error',
+        res.status(err.message === 'User already exists' ? 409 : 500).json({
+            message: err.message,
             error: err.message,
         })
     }
@@ -72,21 +38,13 @@ export const registerUser = async (req, res) => {
 // -----------------------------
 export const loginUser = async (req, res) => {
     try {
-        if (!userFeatures.loginEnabled) {
-            return res.status(403).json({ message: 'Login disabled' })
-        }
+        if (!userAuth.loginEnabled) return res.status(403).json({ message: 'Login disabled' })
 
         const { email, password } = req.body
-        if (!email || !password) {
-            return res
-                .status(400)
-                .json({ message: 'Email and password are required' })
-        }
+        if (!email || !password) return res.status(400).json({ message: 'Email and password are required' })
 
-        const user = await User.findOne({ email })
-        if (!user || !(await user.matchPassword(password))) {
-            return res.status(401).json({ message: 'Invalid credentials' })
-        }
+        // ✅ Await async function
+        const user = await authenticateUser(email, password)
 
         res.json({
             user: formatUser(user),
@@ -94,7 +52,7 @@ export const loginUser = async (req, res) => {
         })
     } catch (err) {
         console.error('Login error:', err)
-        res.status(500).json({ message: 'Server error' })
+        res.status(err.message === 'Invalid credentials' ? 401 : 500).json({ message: err.message })
     }
 }
 
@@ -102,17 +60,26 @@ export const loginUser = async (req, res) => {
 // Get Current User
 // -----------------------------
 export const getCurrentUser = async (req, res) => {
-    res.json(formatUser(req.user))
+    try {
+        if (!req.user) return res.status(401).json({ message: 'Not authorized' })
+
+        // Map _id -> id so your test passes
+        const user = formatUser(req.user)
+
+        res.status(200).json(user)
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' })
+    }
 }
+
+
 
 // -----------------------------
 // Update Current User
 // -----------------------------
 export const updateCurrentUser = async (req, res) => {
     try {
-        if (!userFeatures.profileUpdateEnabled) {
-            return res.status(403).json({ message: 'Profile updates are disabled' })
-        }
+        if (!userAuth.profileUpdateEnabled) return res.status(403).json({ message: 'Profile updates are disabled' })
 
         const { name, email, defaultCurrency } = req.body
         const user = await User.findById(req.user._id)

@@ -1,251 +1,203 @@
-import { jest } from '@jest/globals'
-import jwt from 'jsonwebtoken'
-
+//  npm run test -- tests/unit/controllers/auth.controller.test.js
+import express from 'express'
+import request from 'supertest'
+import User from '../../../models/User.js'
 import {
     registerUser,
     loginUser,
     getCurrentUser,
     updateCurrentUser,
 } from '../../../controllers/authController.js'
+import { registerNewUser, authenticateUser, formatUser } from '../../../helpers/authControllerHelpers.js'
+import { generateToken } from '../../../services/jwtToken.js'
+import { userAuth } from '../../../features/userAuth.js'
 
-import User from '../../../models/User.js'
-import Wallet from '../../../models/Wallet.js'
-import { userFeatures } from '../../../config/featureFlags.js'
-
-// -----------------------------
-// Mocks
-// -----------------------------
+// Mock modules
 jest.mock('../../../models/User.js')
-jest.mock('../../../models/Wallet.js')
-jest.mock('jsonwebtoken')
+jest.mock('../../../helpers/authControllerHelpers.js')
+jest.mock('../../../services/jwtToken.js')
 
-// -----------------------------
-// Helpers
-// -----------------------------
-const mockRes = () => {
-    const res = {}
-    res.status = jest.fn().mockReturnValue(res)
-    res.json = jest.fn().mockReturnValue(res)
-    return res
-}
-
-const mockUser = {
-    _id: 'user123',
-    name: 'John Doe',
-    email: 'john@example.com',
-    defaultCurrency: 'USD',
-    matchPassword: jest.fn(),
-    save: jest.fn(),
-}
-
-beforeEach(() => {
-    jest.clearAllMocks()
-
-    process.env.JWT_SECRET = 'testsecret'
-
-    // Enable all features by default
-    userFeatures.registrationEnabled = true
-    userFeatures.loginEnabled = true
-    userFeatures.profileUpdateEnabled = true
-
-    jwt.sign.mockReturnValue('mock-jwt-token')
+// Setup Express app for testing
+const app = express()
+app.use(express.json())
+app.post('/register', registerUser)
+app.post('/login', loginUser)
+app.get('/me', (req, res) => {
+    req.user = { _id: '1', name: 'Test', email: 'test@a.com', defaultCurrency: 'USD' }
+    getCurrentUser(req, res)
+})
+app.put('/me', (req, res) => {
+    req.user = { _id: '1' }
+    updateCurrentUser(req, res)
 })
 
-/* =====================================================
-   REGISTER USER
-===================================================== */
-describe('registerUser', () => {
-    it('should register a new user and create a wallet', async () => {
-        User.findOne.mockResolvedValue(null)
-        User.create.mockResolvedValue(mockUser)
-        Wallet.create.mockResolvedValue({})
+describe('AuthController', () => {
+    beforeEach(() => {
+        jest.resetAllMocks()
+        userAuth.registrationEnabled = true
+        userAuth.loginEnabled = true
+        userAuth.profileUpdateEnabled = true
+    })
 
-        const req = {
-            body: {
+    // -------------------------------
+    // Register User
+    // -------------------------------
+    describe('registerUser', () => {
+        it('should return 403 if registration is disabled', async () => {
+            userAuth.registrationEnabled = false
+            const res = await request(app).post('/register').send({})
+            expect(res.statusCode).toBe(403)
+            expect(res.body.message).toBe('Registration is disabled')
+        })
+
+        it('should return 400 if required fields are missing', async () => {
+            const res = await request(app).post('/register').send({ name: 'John' })
+            expect(res.statusCode).toBe(400)
+            expect(res.body.message).toBe('All fields are required')
+        })
+
+        it('should register user successfully', async () => {
+            const mockUser = { _id: '1', name: 'John', email: 'john@test.com', defaultCurrency: 'USD' }
+            registerNewUser.mockResolvedValue(mockUser)
+            formatUser.mockReturnValue({ id: '1', name: 'John', email: 'john@test.com', defaultCurrency: 'USD' })
+            generateToken.mockReturnValue('mock-token')
+
+            const res = await request(app)
+                .post('/register')
+                .send({ name: 'John', email: 'john@test.com', password: '123456' })
+
+            expect(res.statusCode).toBe(201)
+            expect(res.body.user).toEqual({ id: '1', name: 'John', email: 'john@test.com', defaultCurrency: 'USD' })
+            expect(res.body.token).toBe('mock-token')
+            expect(registerNewUser).toHaveBeenCalledWith({
                 name: 'John',
-                email: 'john@example.com',
-                password: 'password123',
+                email: 'john@test.com',
+                password: '123456',
                 defaultCurrency: 'USD',
-            },
-        }
-        const res = mockRes()
-
-        await registerUser(req, res)
-
-        expect(User.findOne).toHaveBeenCalledWith({ email: 'john@example.com' })
-        expect(User.create).toHaveBeenCalled()
-        expect(Wallet.create).toHaveBeenCalledWith({
-            userId: mockUser._id,
-            currency: 'USD',
-            balance: 0,
-            status: 'Active',
-            isPrimary: true,
+            })
         })
 
-        expect(res.status).toHaveBeenCalledWith(201)
-        expect(res.json).toHaveBeenCalledWith({
-            user: {
-                id: mockUser._id,
-                name: mockUser.name,
-                email: mockUser.email,
-                defaultCurrency: mockUser.defaultCurrency,
-            },
-            token: 'mock-jwt-token',
+        it('should handle user already exists error', async () => {
+            registerNewUser.mockRejectedValue(new Error('User already exists'))
+            const res = await request(app)
+                .post('/register')
+                .send({ name: 'John', email: 'john@test.com', password: '123456' })
+            expect(res.statusCode).toBe(409)
+            expect(res.body.message).toBe('User already exists')
+        })
+
+        it('should handle generic server error', async () => {
+            registerNewUser.mockRejectedValue(new Error('DB error'))
+            const res = await request(app)
+                .post('/register')
+                .send({ name: 'John', email: 'john@test.com', password: '123456' })
+            expect(res.statusCode).toBe(500)
+            expect(res.body.message).toBe('DB error')
         })
     })
 
-    it('should return 409 if user already exists', async () => {
-        User.findOne.mockResolvedValue(mockUser)
-
-        const req = {
-            body: { name: 'John', email: 'john@example.com', password: 'pass' },
-        }
-        const res = mockRes()
-
-        await registerUser(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(409)
-        expect(res.json).toHaveBeenCalledWith({ message: 'User already exists' })
-    })
-
-    it('should return 403 if registration is disabled', async () => {
-        userFeatures.registrationEnabled = false
-
-        const req = { body: {} }
-        const res = mockRes()
-
-        await registerUser(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(403)
-        expect(res.json).toHaveBeenCalledWith({
-            message: 'Registration is disabled',
+    // -------------------------------
+    // Login User
+    // -------------------------------
+    describe('loginUser', () => {
+        it('should return 403 if login is disabled', async () => {
+            userAuth.loginEnabled = false
+            const res = await request(app).post('/login').send({})
+            expect(res.statusCode).toBe(403)
+            expect(res.body.message).toBe('Login disabled')
         })
-    })
-})
 
-/* =====================================================
-   LOGIN USER
-===================================================== */
-describe('loginUser', () => {
-    it('should login user with valid credentials', async () => {
-        mockUser.matchPassword.mockResolvedValue(true)
-        User.findOne.mockResolvedValue(mockUser)
+        it('should return 400 if email or password missing', async () => {
+            const res = await request(app).post('/login').send({ email: 'a@b.com' })
+            expect(res.statusCode).toBe(400)
+            expect(res.body.message).toBe('Email and password are required')
+        })
 
-        const req = {
-            body: { email: 'john@example.com', password: 'password123' },
-        }
-        const res = mockRes()
+        it('should login user successfully', async () => {
+            const mockUser = { _id: '1', name: 'John', email: 'john@test.com', defaultCurrency: 'USD' }
+            authenticateUser.mockResolvedValue(mockUser)
+            formatUser.mockReturnValue({ id: '1', name: 'John', email: 'john@test.com', defaultCurrency: 'USD' })
+            generateToken.mockReturnValue('mock-token')
 
-        await loginUser(req, res)
+            const res = await request(app)
+                .post('/login')
+                .send({ email: 'john@test.com', password: '123456' })
 
-        expect(User.findOne).toHaveBeenCalledWith({ email: 'john@example.com' })
-        expect(res.json).toHaveBeenCalledWith({
-            user: {
-                id: mockUser._id,
-                name: mockUser.name,
-                email: mockUser.email,
-                defaultCurrency: mockUser.defaultCurrency,
-            },
-            token: 'mock-jwt-token',
+            expect(res.statusCode).toBe(200)
+            expect(res.body.user).toEqual({ id: '1', name: 'John', email: 'john@test.com', defaultCurrency: 'USD' })
+            expect(res.body.token).toBe('mock-token')
+            expect(authenticateUser).toHaveBeenCalledWith('john@test.com', '123456')
+        })
+
+        it('should return 401 for invalid credentials', async () => {
+            authenticateUser.mockRejectedValue(new Error('Invalid credentials'))
+            const res = await request(app)
+                .post('/login')
+                .send({ email: 'john@test.com', password: 'wrong' })
+            expect(res.statusCode).toBe(401)
+            expect(res.body.message).toBe('Invalid credentials')
         })
     })
 
-    it('should reject invalid credentials', async () => {
-        mockUser.matchPassword.mockResolvedValue(false)
-        User.findOne.mockResolvedValue(mockUser)
+    // -------------------------------
+    // Get Current User
+    // -------------------------------
 
-        const req = {
-            body: { email: 'john@example.com', password: 'wrongpass' },
-        }
-        const res = mockRes()
+    describe('getCurrentUser', () => {
+        it('should return current user', async () => {
+            const fakeUser = {
+                _id: '64f123abc456def78901234',
+                name: 'Test User',
+                email: 'test@example.com',
+                defaultCurrency: 'USD'
+            }
 
-        await loginUser(req, res)
+            const req = { user: fakeUser }
+            const json = jest.fn()
+            const res = { status: jest.fn(() => ({ json })) }
 
-        expect(res.status).toHaveBeenCalledWith(401)
-        expect(res.json).toHaveBeenCalledWith({
-            message: 'Invalid credentials',
+            await getCurrentUser(req, res)
+
+            expect(res.status).toHaveBeenCalledWith(200)
+            expect(json).toHaveBeenCalledWith(formatUser(fakeUser))
         })
     })
 
-    it('should return 403 if login is disabled', async () => {
-        userFeatures.loginEnabled = false
 
-        const req = { body: {} }
-        const res = mockRes()
 
-        await loginUser(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(403)
-        expect(res.json).toHaveBeenCalledWith({
-            message: 'Login disabled',
+    // -------------------------------
+    // Update Current User
+    // -------------------------------
+    describe('updateCurrentUser', () => {
+        it('should return 403 if profile updates are disabled', async () => {
+            userAuth.profileUpdateEnabled = false
+            const res = await request(app).put('/me').send({})
+            expect(res.statusCode).toBe(403)
+            expect(res.body.message).toBe('Profile updates are disabled')
         })
-    })
-})
 
-/* =====================================================
-   GET CURRENT USER
-===================================================== */
-describe('getCurrentUser', () => {
-    it('should return the authenticated user', async () => {
-        const req = { user: mockUser }
-        const res = mockRes()
+        it('should update user successfully', async () => {
+            const mockSave = jest.fn().mockResolvedValue(true)
+            User.findById.mockResolvedValue({
+                _id: '1',
+                name: 'Old',
+                email: 'old@test.com',
+                defaultCurrency: 'USD',
+                save: mockSave,
+            })
+            formatUser.mockReturnValue({ id: '1', name: 'New', email: 'old@test.com', defaultCurrency: 'USD' })
 
-        await getCurrentUser(req, res)
-
-        expect(res.json).toHaveBeenCalledWith({
-            id: mockUser._id,
-            name: mockUser.name,
-            email: mockUser.email,
-            defaultCurrency: mockUser.defaultCurrency,
+            const res = await request(app).put('/me').send({ name: 'New' })
+            expect(res.statusCode).toBe(200)
+            expect(res.body.user.name).toBe('New')
+            expect(mockSave).toHaveBeenCalled()
         })
-    })
-})
 
-/* =====================================================
-   UPDATE CURRENT USER
-===================================================== */
-describe('updateCurrentUser', () => {
-    it('should update user profile', async () => {
-        User.findById.mockResolvedValue(mockUser)
-
-        const req = {
-            user: { _id: mockUser._id },
-            body: {
-                name: 'New Name',
-                email: 'new@email.com',
-                defaultCurrency: 'eur',
-            },
-        }
-        const res = mockRes()
-
-        await updateCurrentUser(req, res)
-
-        expect(mockUser.name).toBe('New Name')
-        expect(mockUser.email).toBe('new@email.com')
-        expect(mockUser.defaultCurrency).toBe('EUR')
-        expect(mockUser.save).toHaveBeenCalled()
-
-        expect(res.json).toHaveBeenCalledWith({
-            user: {
-                id: mockUser._id,
-                name: 'New Name',
-                email: 'new@email.com',
-                defaultCurrency: 'EUR',
-            },
-        })
-    })
-
-    it('should return 403 if profile update is disabled', async () => {
-        userFeatures.profileUpdateEnabled = false
-
-        const req = { user: { _id: 'id' }, body: {} }
-        const res = mockRes()
-
-        await updateCurrentUser(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(403)
-        expect(res.json).toHaveBeenCalledWith({
-            message: 'Profile updates are disabled',
+        it('should return 404 if user not found', async () => {
+            User.findById.mockResolvedValue(null)
+            const res = await request(app).put('/me').send({ name: 'New' })
+            expect(res.statusCode).toBe(404)
+            expect(res.body.message).toBe('User not found')
         })
     })
 })

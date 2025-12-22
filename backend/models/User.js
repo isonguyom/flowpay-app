@@ -1,8 +1,12 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-import { isCurrencyAllowed } from '../config/currenciesConfig.js';
-import { USER_STATUS, USER_ROLES } from '../helpers/userHelpers.js';
+import mongoose from 'mongoose'
+import bcrypt from 'bcryptjs'
+import { isCurrencyAllowed } from '../config/currenciesConfig.js'
+import { USER_STATUS, USER_ROLES } from '../config/userConfig.js'
 
+/**
+ * User Schema
+ * Represents a platform user with authentication, role, and currency info
+ */
 const userSchema = new mongoose.Schema(
     {
         name: {
@@ -17,7 +21,9 @@ const userSchema = new mongoose.Schema(
             unique: true,
             lowercase: true,
             trim: true,
+            immutable: true, // 🔒 prevents updates after creation
         },
+
 
         passwordHash: {
             type: String,
@@ -44,6 +50,7 @@ const userSchema = new mongoose.Schema(
             enum: Object.values(USER_ROLES),
             default: USER_ROLES.USER,
         },
+
         status: {
             type: String,
             enum: Object.values(USER_STATUS),
@@ -51,19 +58,26 @@ const userSchema = new mongoose.Schema(
         },
     },
     { timestamps: true }
-);
+)
 
-// Hash password before saving
+/**
+ * Pre-save middleware to hash password if modified
+ */
 userSchema.pre('save', async function () {
-    if (!this.isModified('passwordHash')) return;
+    if (!this.isModified('passwordHash')) return
 
-    const salt = await bcrypt.genSalt(10);
-    this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-});
+    const salt = await bcrypt.genSalt(10)
+    this.passwordHash = await bcrypt.hash(this.passwordHash, salt)
+})
 
-// Compare password
+
+/**
+ * Compare entered password with hashed password
+ * @param {string} enteredPassword
+ * @returns {Promise<boolean>} true if match
+ */
 userSchema.methods.matchPassword = async function (enteredPassword) {
-    return bcrypt.compare(enteredPassword, this.passwordHash);
-};
+    return bcrypt.compare(enteredPassword, this.passwordHash)
+}
 
-export default mongoose.model('User', userSchema);
+export default mongoose.model('User', userSchema)
