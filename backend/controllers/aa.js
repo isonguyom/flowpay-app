@@ -1,12 +1,11 @@
-// controllers/walletController.js
 import Wallet from '../models/Wallet.js'
 import Transaction from '../models/Transaction.js'
 import { getSocket } from '../services/socket.js'
 import { getStripe } from '../services/stripeService.js'
 import { TRX_STATUS, TRX_TYPE } from '../config/transactionConfig.js'
 
-
 const stripe = getStripe()
+
 const emit = (userId, event, payload) => {
     try {
         getSocket()?.to(userId.toString()).emit(event, payload)
@@ -15,9 +14,9 @@ const emit = (userId, event, payload) => {
     }
 }
 
-// --------------------
-// Create a new wallet
-// --------------------
+/* -------------------------------------------------------------------------- */
+/*                                CREATE WALLET                               */
+/* -------------------------------------------------------------------------- */
 export const createWallet = async (req, res) => {
     try {
         const userId = req.user?._id
@@ -26,24 +25,27 @@ export const createWallet = async (req, res) => {
         if (!userId) return res.status(401).json({ message: 'Unauthorized' })
         if (!currency) return res.status(400).json({ message: 'Currency is required' })
 
-        const existingWallet = await Wallet.findOne({ userId, currency })
-        if (existingWallet) return res.status(409).json({ message: `Wallet for ${currency} already exists` })
+        const exists = await Wallet.findOne({ userId, currency })
+        if (exists) {
+            return res.status(409).json({ message: `Wallet for ${currency} already exists` })
+        }
 
-        const wallet = await Wallet.create({ userId, currency })
-        res.status(201).json({ message: 'Wallet created successfully', wallet })
+        const wallet = await Wallet.create({ userId, currency, balance: 0 })
+        emit(userId, 'walletCreated', wallet)
 
-        getSocket()?.to(userId.toString()).emit('walletCreated', wallet)
+        res.status(201).json({ wallet })
     } catch (err) {
-        console.error(err)
+        console.error('Create wallet error:', err)
         res.status(500).json({ message: 'Failed to create wallet' })
     }
 }
 
-// --------------------
-// Fund wallet
-// --------------------
+/* -------------------------------------------------------------------------- */
+/*                                FUND WALLET                                 */
+/* -------------------------------------------------------------------------- */
 export const fundWallet = async (req, res) => {
     try {
+
         const userId = req.user?._id
         const { walletId, amount, fundingAccount } = req.body
 
@@ -81,34 +83,27 @@ export const fundWallet = async (req, res) => {
             status: TRX_STATUS.PENDING,
         })
 
+
         emit(userId, 'transactionCreated', transaction)
 
         res.status(201).json({
             clientSecret: paymentIntent.client_secret,
             transactionId: transaction._id,
         })
-
-        // Simulate webhook / completion
-        setTimeout(async () => {
-            transaction.status = TRX_STATUS.COMPLETED
-            await transaction.save()
-            getSocket()?.to(userId.toString()).emit('transactionUpdated', transaction)
-        }, 2000)
-
-        res.json({ message: 'Wallet funded successfully', wallet, transaction })
     } catch (err) {
-        console.error(err)
-        res.status(500).json({ message: 'Failed to fund wallet' })
+        console.error('Fund wallet error:', err)
+        res.status(500).json({ message: 'Failed to initiate funding' })
     }
 }
 
-// --------------------
-// Withdraw from wallet
+/* -------------------------------------------------------------------------- */
+/*                              WITHDRAW WALLET                               */
+/* -------------------------------------------------------------------------- */
 // --------------------
 export const withdrawFromWallet = async (req, res) => {
     try {
         const userId = req.user?._id
-        const { walletId, amount, recipient } = req.body
+        const { walletId, amount, beneficiary } = req.body
 
         if (!userId) return res.status(401).json({ message: 'Unauthorized' })
         if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' })
@@ -122,45 +117,48 @@ export const withdrawFromWallet = async (req, res) => {
         wallet.balance -= amount
         await wallet.save()
 
+        const payout = await stripe.payouts.create({
+            amount: Math.round(amount * 100),
+            currency: wallet.currency,
+            beneficiary,
+            metadata: {
+                userId: userId.toString(),
+                walletId: wallet._id.toString(),
+                type: TRX_TYPE.WITHDRAW,
+            },
+        })
+
         // Create transaction
         const transaction = await Transaction.create({
             userId,
             walletId,
             type: TRX_TYPE.WITHDRAW,
             amount,
-            sourceCurrency: wallet.currency,
-            destinationCurrency: wallet.currency,
-            beneficiary: recipient || '',
+            sourceCurrency: wallet.currency.toUpperCase(),
+            destinationCurrency: wallet.currency.toUpperCase(),
+            beneficiary,
             status: TRX_STATUS.PENDING,
         })
 
-        // Emit WebSocket update
-        getSocket()?.to(userId.toString()).emit('walletUpdated', wallet)
-        getSocket()?.to(userId.toString()).emit('transactionCreated', transaction)
+        emit(userId, 'transactionCreated', transaction)
 
-        // Simulate webhook / completion
-        setTimeout(async () => {
-            transaction.status = TRX_STATUS.COMPLETED
-            await transaction.save()
-            getSocket()?.to(userId.toString()).emit('transactionUpdated', transaction)
-        }, 2000)
-
-        res.json({ message: 'Withdrawal successful', wallet, transaction })
+        res.json({ wallet, transaction, clientSecret: payout.client_secret })
     } catch (err) {
         console.error(err)
         res.status(500).json({ message: 'Failed to withdraw from wallet' })
     }
 }
 
-// --------------------
-// Get wallets
-// --------------------
+
+/* -------------------------------------------------------------------------- */
+/*                                 GET WALLETS                                */
+/* -------------------------------------------------------------------------- */
 export const getWallets = async (req, res) => {
     try {
         const wallets = await Wallet.find({ userId: req.user._id }).sort({ createdAt: 1 })
         res.json({ wallets })
     } catch (err) {
-        console.error(err)
+        console.error('Get wallets error:', err)
         res.status(500).json({ message: 'Failed to fetch wallets' })
     }
 }

@@ -4,11 +4,19 @@ import { TRX_STATUS } from '../config/transactionConfig.js';
 
 const paymentSchema = new mongoose.Schema(
     {
+        // ======================== REFERENCES ========================
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: [true, 'User reference is required'],
         },
+        sourceWalletId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Wallet',
+            required: [true, 'Source wallet is required'],
+        },
+
+        // ======================== PAYMENT DETAILS ========================
         beneficiary: {
             type: String,
             required: [true, 'Beneficiary is required'],
@@ -18,27 +26,6 @@ const paymentSchema = new mongoose.Schema(
             type: Number,
             required: [true, 'Amount is required'],
             min: [0, 'Amount must be positive'],
-        },
-        sourceWalletId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Wallet',
-            required: [true, 'Source wallet is required'],
-        },
-        destinationCurrency: {
-            type: String,
-            required: [true, 'Destination currency is required'],
-            uppercase: true,
-            validate: {
-                validator: function (value) {
-                    return isCurrencyAllowed(value);
-                },
-                message: 'Destination currency not allowed',
-            },
-        },
-        fxRate: {
-            type: Number,
-            required: [true, 'FX rate is required'],
-            min: [0, 'FX rate must be positive'],
         },
         fee: {
             type: Number,
@@ -50,6 +37,25 @@ const paymentSchema = new mongoose.Schema(
             required: [true, 'Settlement amount is required'],
             min: [0, 'Settlement amount must be positive'],
         },
+        fxRate: {
+            type: Number,
+            required: [true, 'FX rate is required'],
+            min: [0.000001, 'FX rate must be greater than zero'],
+        },
+
+        // ======================== CURRENCIES ========================
+        destinationCurrency: {
+            type: String,
+            required: [true, 'Destination currency is required'],
+            uppercase: true,
+            trim: true,
+            validate: {
+                validator: isCurrencyAllowed,
+                message: 'Destination currency `{VALUE}` not allowed',
+            },
+        },
+
+        // ======================== METADATA ========================
         stripeId: {
             type: String,
             index: true,
@@ -58,14 +64,20 @@ const paymentSchema = new mongoose.Schema(
             type: String,
             enum: Object.values(TRX_STATUS),
             default: TRX_STATUS.PENDING,
+            index: true,
         },
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+        minimize: true,
+    }
 );
 
 // Pre-save hook to sanitize currency
 paymentSchema.pre('save', function () {
-    this.destinationCurrency = sanitizeCurrency(this.destinationCurrency);
+    if (this.destinationCurrency) {
+        this.destinationCurrency = sanitizeCurrency(this.destinationCurrency);
+    }
 });
 
 export default mongoose.model('Payment', paymentSchema);

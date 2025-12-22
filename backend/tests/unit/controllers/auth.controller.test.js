@@ -1,4 +1,4 @@
-//  npm run test -- tests/unit/controllers/auth.controller.test.js
+//  npm run test -- tests/unit/controllers/auth.controller.test.jskend> 
 import express from 'express'
 import request from 'supertest'
 import User from '../../../models/User.js'

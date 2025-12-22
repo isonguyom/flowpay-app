@@ -99,7 +99,6 @@ const transactionSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: '',
-            maxlength: 100,
         },
 
         fundingAccount: {

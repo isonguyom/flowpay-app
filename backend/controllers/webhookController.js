@@ -1,91 +1,51 @@
-import Transaction from '../models/Transaction.js'
-import { getStripe } from '../services/stripeService.js'
-import { getSocket } from '../services/socket.js'
+import { getStripe } from '../services/stripeService.js';
+import { handleFundingIntent, handleWithdrawalIntent } from '../hooks/walletIntent.js';
+import { handlePaymentIntent } from '../hooks/paymentIntent.js';
 
-const stripe = getStripe()
-
-// --------------------
-// Stripe Webhook Handler
-// --------------------
-export const handleStripeWebhook = async (req, res) => {
-    const sig = req.headers['stripe-signature']
-
-    let event
-    try {
-        // Stripe requires raw body for signature verification
-        event = stripe.webhooks.constructEvent(
-            req.body,
-            sig,
-            process.env.STRIPE_WEBHOOK_SECRET
-        )
-    } catch (err) {
-        console.error('Webhook signature verification failed:', err.message)
-        return res.status(400).send(`Webhook Error: ${err.message}`)
+export const handleStripeWebhooks = async (req, res) => {
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        throw new Error('STRIPE_WEBHOOK_SECRET not configured');
     }
 
-    const paymentIntent = event.data.object
+    const stripe = getStripe();
+    const signature = req.headers['stripe-signature'];
+
+    if (!signature) {
+        return res.status(400).json({ message: 'Missing Stripe signature' });
+    }
+
+    let event;
 
     try {
-        let transaction
-        const io = getSocket()
+        // Verify webhook signature
+        event = stripe.webhooks.constructEvent(req.rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        console.error('❌ Stripe webhook verification failed:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
 
+    try {
         switch (event.type) {
-            case 'payment_intent.created':
-                console.log('PaymentIntent created:', paymentIntent.id)
+            case 'payment_intent.succeeded': {
+                const type = event?.data?.object?.metadata?.type;
+                if (type === 'WALLET_FUND') await handleFundingIntent(event.data.object);
+                else if (type === 'PAYMENT') await handlePaymentIntent(event.data.object);
+                else console.log('ℹ️ Unknown payment_intent type:', type);
+                break;
+            }
 
-                transaction = await Transaction.create({
-                    stripeId: paymentIntent.id,
-                    user: paymentIntent.metadata.userId,
-                    type: paymentIntent.metadata.type || 'PAYMENT',
-                    amount: paymentIntent.amount,
-                    sourceCurrency: paymentIntent.currency.toUpperCase(),
-                    status: 'Pending',
-                })
-
-                io.to(transaction.user.toString()).emit('transaction:created', transaction)
-                break
-
-            case 'payment_intent.succeeded':
-                console.log('PaymentIntent succeeded:', paymentIntent.id)
-
-                transaction = await Transaction.findOneAndUpdate(
-                    { stripeId: paymentIntent.id },
-                    { status: 'Completed' },
-                    { new: true, runValidators: true }
-                )
-
-                if (transaction) {
-                    io.to(transaction.user.toString()).emit('transaction:updated', transaction)
-                }
-                break
-
-            case 'payment_intent.payment_failed':
-                console.log('PaymentIntent failed:', paymentIntent.id)
-
-                transaction = await Transaction.findOneAndUpdate(
-                    { stripeId: paymentIntent.id },
-                    { status: 'Failed' },
-                    { new: true, runValidators: true }
-                )
-
-                if (transaction) {
-                    io.to(transaction.user.toString()).emit('transaction:updated', transaction)
-                }
-                break
+            case 'payout.paid':
+                await handleWithdrawalIntent(event.data.object);
+                break;
 
             default:
-                console.log(`Unhandled event type: ${event.type}`)
+                console.log(`ℹ️ Unhandled Stripe event: ${event.type}`);
         }
 
-        res.json({ received: true })
+        // Respond 204 to Stripe
+        res.sendStatus(204);
     } catch (err) {
-        console.error('Processing webhook event failed:', err)
-        res.status(500).send('Internal server error')
+        console.error('❌ Stripe webhook processing error:', err);
+        res.status(500).json({ message: 'Webhook processing failed' });
     }
-}
-
-// Optional simple test webhook handler
-export const handlePaymentWebhook = async (req, res) => {
-    console.log('🔥 WEBHOOK RECEIVED', req.body)
-    res.sendStatus(200)
-}
+};
