@@ -1,68 +1,113 @@
-import axios from 'axios'
-import { currencies, DEFAULT_CURRENCY, isCurrencyAllowed, getCurrencyMeta } from '../config/currencies.js'
+import axios from 'axios';
+import {
+    currencies,
+    legacyCurrencies,
+    DEFAULT_CURRENCY,
+    FX_BRIDGE_CURRENCY,
+    isCurrencyAllowed,
+    getCurrencyMeta,
+    normalizeRateToBase,
+    SUPPORTED_CURRENCIES,
+    ACTIVE_CURRENCY_MODE,
+    CURRENCY_MODE,
+} from '../config/currenciesConfig.js';
 
 /**
- * Get FX rates normalized to a dynamic base currency.
- * Returns rates and meta info for all supported currencies.
- *
- * @param {string} baseCurrency - Desired base currency (falls back to DEFAULT_CURRENCY)
+ * Round to fixed decimals
+ */
+const roundAmount = (amount, decimals = 2) =>
+    Number((Math.round(amount * 10 ** decimals) / 10 ** decimals).toFixed(decimals));
+
+/**
+ * Get FX rates
+ * Hierarchy: ONLINE → OFFLINE → DEFAULT → LEGACY
  */
 export const getFxRates = async (baseCurrency) => {
-    // Validate and normalize base currency
-    const base = isCurrencyAllowed(baseCurrency) ? baseCurrency.toUpperCase() : DEFAULT_CURRENCY
+    const base = isCurrencyAllowed(baseCurrency)
+        ? baseCurrency.toUpperCase()
+        : DEFAULT_CURRENCY;
 
-    let apiRates = {}
-    let fallbackUsed = false
+    let apiRates = {};
 
     try {
-        const res = await axios.get(`https://api.frankfurter.app/latest?from=${base}`)
-        apiRates = res.data.rates
-    } catch {
-        fallbackUsed = true
+        const res = await axios.get(
+            `https://api.frankfurter.app/latest?from=${FX_BRIDGE_CURRENCY}`
+        );
+        apiRates = res.data?.rates || {};
+    } catch (err) {
+        throw new Error('FX API failed: ' + err.message);
     }
 
-    const fxList = Object.entries(currencies).map(([code, meta]) => {
-        const currencyMeta = getCurrencyMeta(code)
+    const allowedCurrencies =
+        ACTIVE_CURRENCY_MODE === CURRENCY_MODE.STRICT
+            ? SUPPORTED_CURRENCIES
+            : [
+                ...new Set([
+                    ...Object.keys(apiRates),
+                    ...SUPPORTED_CURRENCIES,
+                    ...Object.keys(legacyCurrencies),
+                ]),
+            ];
 
-        // Normalize rate: 1 for base currency, else API or offline rate
-        let rate
-        if (code === base) {
-            rate = 1
-        } else if (apiRates[code]) {
-            rate = apiRates[code]
-        } else if (currencyMeta.offlineRate) {
-            rate = currencyMeta.offlineRate
-            fallbackUsed = true
-        } else {
-            // If currency exists but no offline rate, fallback to 1:1 flagged
-            rate = 1
-            fallbackUsed = true
+    const fxList = allowedCurrencies.map((code) => {
+        const meta = getCurrencyMeta(code);
+
+        let rate = code === base ? 1 : null;
+        let status = code === base ? 'online' : null;
+        let fallbackUsed = false;
+
+        if (code !== base) {
+            if (apiRates[code]) {
+                rate = normalizeRateToBase(code, base);
+                status = 'online';
+            } else if (currencies[code]?.offlineRate) {
+                rate = normalizeRateToBase(code, base);
+                status = 'offline';
+                fallbackUsed = true;
+            } else if (currencies[code]?.defaultRate) {
+                rate = normalizeRateToBase(code, base);
+                status = 'defaulted';
+                fallbackUsed = true;
+            } else if (legacyCurrencies[code]) {
+                rate = normalizeRateToBase(code, base);
+                status = 'legacy';
+                fallbackUsed = true;
+            } else {
+                throw new Error(`No FX rate available for currency: ${code}`);
+            }
         }
 
         return {
             value: code,
-            label: currencyMeta.label,
-            symbol: currencyMeta.symbol,
-            color: currencyMeta.color,
-            rate,
-            offline: !apiRates[code], // true if we had to use offline or default
-        }
-    })
+            label: meta.label,
+            symbol: meta.symbol,
+            color: meta.color,
+            rate: roundAmount(rate),
+            status,
+            fallbackUsed,
+        };
+    });
 
-    return {
-        base,
-        fallbackUsed,
-        fxList,
-    }
-}
+    return { base, fxList };
+};
 
 /**
- * Convert an amount from one currency to another using dynamic FX rates.
+ * Convert amount safely between currencies
  */
 export const convertAmount = async (amount, from, to) => {
-    const { fxList } = await getFxRates(from)
-    const target = fxList.find(c => c.value === to.toUpperCase())
-    if (!target) throw new Error(`Currency ${to} is not supported`)
+    if (!amount || amount <= 0) {
+        throw new Error('Invalid amount');
+    }
 
-    return amount * target.rate
-}
+    const fromMeta = getCurrencyMeta(from.toUpperCase());
+    const toMeta = getCurrencyMeta(to.toUpperCase());
+
+    const converted =
+        (amount / fromMeta.usdRate) * toMeta.usdRate;
+
+    if (!Number.isFinite(converted)) {
+        throw new Error('FX conversion overflow');
+    }
+
+    return roundAmount(converted, 2);
+};

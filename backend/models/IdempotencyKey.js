@@ -39,7 +39,7 @@ const idempotencySchema = new mongoose.Schema(
   }
 );
 
-// Optional: add a compound index for user + endpoint to prevent duplicates per user
+// add a compound index for user + endpoint to prevent duplicates per user
 idempotencySchema.index({ userId: 1, endpoint: 1, key: 1 }, { unique: true });
 
 export default mongoose.model('IdempotencyKey', idempotencySchema);

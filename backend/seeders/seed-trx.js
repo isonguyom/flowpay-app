@@ -9,7 +9,7 @@ import { DEFAULT_CURRENCY } from '../config/currencies.js';
 import { connectDB, disconnectDB } from '../services/db.js';
 
 const seedTransactions = async () => {
-  await connectDB(); // use the service file
+  await connectDB(); 
   console.log('MongoDB connected');
 
   // Clear existing transactions

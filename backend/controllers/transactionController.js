@@ -1,40 +1,75 @@
 import Transaction from '../models/Transaction.js'
 import { getSocket } from '../services/socket.js'
+import {
+    buildTransactionQuery
+} from '../helpers/transactionControllerHelpers.js'
 
+
+// ==================================== GET API CONTROLLER =================================
 /**
- * Get all transactions for the logged-in user
- * Optional query params: type, status, startDate, endDate
+ * GET /api/transactions
+ * Fetch transactions for authenticated user
  */
 export const getUserTransactions = async (req, res) => {
+    const userId = req.user?._id
+
+    if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' })
+    }
+
     try {
-        const { type, status, startDate, endDate } = req.query
-        const query = { user: req.user._id }
+        const query = buildTransactionQuery({
+            userId,
+            type: req.query.type,
+            status: req.query.status,
+            startDate: req.query.startDate,
+            endDate: req.query.endDate
+        })
 
-        if (type) query.type = type.toUpperCase()
-        if (status) query.status = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
-        if (startDate || endDate) query.createdAt = {}
-        if (startDate) query.createdAt.$gte = new Date(startDate)
-        if (endDate) query.createdAt.$lte = new Date(endDate)
+        const transactions = await Transaction
+            .find(query)
+            .sort({ createdAt: -1 })
 
-        const transactions = await Transaction.find(query).sort({ createdAt: -1 })
+        return res.json({ transactions })
 
-        res.json({ transactions })
     } catch (err) {
-        console.error('Error fetching transactions:', err)
-        res.status(500).json({ message: 'Server error', error: err.message })
+        console.error('[TransactionController] getUserTransactions failed', {
+            userId: userId.toString(),
+            error: err.message
+        })
+
+        return res.status(500).json({
+            message: 'Failed to fetch transactions'
+        })
     }
 }
 
+// ================================ SOCKET EMITTER =================================
 /**
- * Emit transaction updates via Socket.IO
- * @param {Object} transaction - Transaction object
+ * Emit transaction events via Socket.IO
+ * This must NEVER throw or affect request lifecycle
  */
 export const emitTransactionUpdate = (transaction) => {
     try {
+        if (!transaction?._id || !transaction?.userId) {
+            console.warn(
+                '[Socket] emitTransactionUpdate skipped – invalid transaction',
+                { transactionId: transaction?._id }
+            )
+            return
+        }
+
         const io = getSocket()
-        io.to(transaction.user.toString()).emit('transaction:created', transaction)
-        console.log(`WebSocket emitted transaction:created for user ${transaction.user}`)
+        if (!io) return
+
+        io
+            .to(transaction.userId.toString())
+            .emit('transactionCreated', transaction)
+
     } catch (err) {
-        console.error('Failed to emit transaction update:', err.message)
+        console.error('[Socket] Failed to emit transaction update', {
+            transactionId: transaction?._id,
+            error: err.message
+        })
     }
 }

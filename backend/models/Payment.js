@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
-import { isCurrencyAllowed, sanitizeCurrency } from '../config/currencies.js';
-import { TRX_STATUS } from '../helpers/trxHelpers.js'; // you can define this like WALLET_STATUS
+import { isCurrencyAllowed, sanitizeCurrency } from '../config/currenciesConfig.js';
+import { TRX_STATUS } from '../config/transactionConfig.js';
 
 const paymentSchema = new mongoose.Schema(
     {

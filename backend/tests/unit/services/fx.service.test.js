@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import axios from 'axios';
-import { getFxRates } from '../../../services/fxService.js';
-import { currencies } from '../../../config/currencies.js';
 
-// Mock axios (Jest style)
+import {
+    legacyCurrencies,
+    SUPPORTED_CURRENCIES,
+    normalizeRateToBase,
+} from '../../../config/currencies.js';
+
+import { getFxRates, convertAmount } from '../../../services/fxService.js';
+
 jest.mock('axios');
 
 describe('FX Service', () => {
@@ -11,73 +15,109 @@ describe('FX Service', () => {
         jest.clearAllMocks();
     });
 
-    it('returns 1 for the base currency', async () => {
-        axios.get.mockResolvedValue({
-            data: {
-                rates: { EUR: 0.9 },
-            },
+    describe('getFxRates', () => {
+        it('returns 1 for base currency with online status', async () => {
+            axios.get.mockResolvedValue({ data: { rates: {} } });
+
+            const result = await getFxRates('USD');
+            const usd = result.fxList.find(c => c.value === 'USD');
+
+            expect(usd.rate).toBe(1);
+            expect(usd.status).toBe('online');
+            expect(usd.fallbackUsed).toBe(false);
         });
 
-        const result = await getFxRates('USD');
-        const usd = result.fxList.find(fx => fx.value === 'USD');
+        it('throws error when API fails', async () => {
+            axios.get.mockRejectedValue(new Error('API down'));
 
-        expect(usd.rate).toBe(1);
-        expect(usd.offline).toBe(true); // base currency has no API rate
+            await expect(getFxRates('USD'))
+                .rejects
+                .toThrow('FX API failed: API down');
+        });
+
+        it('uses API rates when API succeeds', async () => {
+            axios.get.mockResolvedValue({
+                data: { rates: { EUR: 0.92, GBP: 0.79 } },
+            });
+
+            const result = await getFxRates('USD');
+
+            const eur = result.fxList.find(c => c.value === 'EUR');
+            const gbp = result.fxList.find(c => c.value === 'GBP');
+
+            expect(eur.rate).toBeCloseTo(normalizeRateToBase('EUR', 'USD'), 2);
+            expect(eur.status).toBe('online');
+
+            expect(gbp.rate).toBeCloseTo(normalizeRateToBase('GBP', 'USD'), 2);
+            expect(gbp.status).toBe('online');
+        });
+
+        it('includes offline/defaulted currencies when not in API', async () => {
+            axios.get.mockResolvedValue({ data: { rates: {} } });
+
+            const result = await getFxRates('USD');
+            const ngn = result.fxList.find(c => c.value === 'NGN');
+
+            expect(ngn.rate).toBeCloseTo(normalizeRateToBase('NGN', 'USD'), 2);
+            expect(['offline', 'defaulted']).toContain(ngn.status);
+            expect(ngn.fallbackUsed).toBe(true);
+        });
+
+        it('handles legacy currencies when present in allowed set', async () => {
+            axios.get.mockResolvedValue({ data: { rates: {} } });
+
+            const result = await getFxRates('USD');
+
+            Object.keys(legacyCurrencies).forEach(code => {
+                const cur = result.fxList.find(c => c.value === code);
+                if (cur) {
+                    expect(cur.status).toBe('legacy');
+                    expect(cur.fallbackUsed).toBe(true);
+                }
+            });
+        });
+
+        it('filters currencies based on supported list', async () => {
+            axios.get.mockResolvedValue({
+                data: { rates: { EUR: 0.92, GBP: 0.79, JPY: 148 } },
+            });
+
+            const result = await getFxRates('USD');
+
+            result.fxList.forEach(c => {
+                expect(
+                    SUPPORTED_CURRENCIES.includes(c.value) ||
+                    legacyCurrencies[c.value]
+                ).toBe(true);
+            });
+        });
     });
 
-    it('uses API rates when available', async () => {
-        axios.get.mockResolvedValue({
-            data: {
-                rates: { EUR: 0.85, GBP: 0.75 },
-            },
+    describe('convertAmount', () => {
+        it('converts normal currencies', async () => {
+            const converted = await convertAmount(100, 'USD', 'EUR');
+            expect(converted).toBeGreaterThan(0);
         });
 
-        const result = await getFxRates('USD');
-
-        const eur = result.fxList.find(fx => fx.value === 'EUR');
-        const gbp = result.fxList.find(fx => fx.value === 'GBP');
-
-        expect(eur.rate).toBe(0.85);
-        expect(eur.offline).toBe(false);
-
-        expect(gbp.rate).toBe(0.75);
-        expect(gbp.offline).toBe(false);
-
-        expect(result.fallbackUsed).toBe(false);
-    });
-
-    it('falls back to offline rates when API fails', async () => {
-        axios.get.mockRejectedValue(new Error('Network error'));
-
-        const result = await getFxRates('USD');
-
-        expect(result.fallbackUsed).toBe(true);
-
-        result.fxList.forEach(fx => {
-            if (fx.value !== 'USD') {
-                const offlineRate = currencies[fx.value]?.offlineRate ?? null;
-                expect(fx.rate).toBe(offlineRate);
-                expect(fx.offline).toBe(true);
-            }
-        });
-    });
-
-    it('returns null rate when neither API nor offline rate exists', async () => {
-        axios.get.mockResolvedValue({
-            data: {
-                rates: {}, // empty API response
-            },
+        it('converts using legacy currencies', async () => {
+            const converted = await convertAmount(100, 'ABC', 'XYZ');
+            expect(converted).toBeGreaterThan(0);
         });
 
-        const result = await getFxRates('USD');
+        it('throws error on unsupported currencies', async () => {
+            await expect(convertAmount(100, 'USD', 'NOP'))
+                .rejects
+                .toThrow('Unsupported currency');
+        });
 
-        const unknown = result.fxList.find(
-            fx => fx.value !== 'USD' && !currencies[fx.value].offlineRate
-        );
+        it('throws error on invalid amounts', async () => {
+            await expect(convertAmount(-10, 'USD', 'EUR'))
+                .rejects
+                .toThrow('Invalid amount');
 
-        if (unknown) {
-            expect(unknown.rate).toBeNull();
-            expect(unknown.offline).toBe(true);
-        }
+            await expect(convertAmount(0, 'USD', 'EUR'))
+                .rejects
+                .toThrow('Invalid amount');
+        });
     });
 });

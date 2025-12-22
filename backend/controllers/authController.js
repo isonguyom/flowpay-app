@@ -23,30 +23,35 @@ const formatUser = (user) => ({
 export const registerUser = async (req, res) => {
     try {
         if (!userFeatures.registrationEnabled) {
-            return res.status(403).json({ message: 'Registration is temporarily disabled' })
+            return res.status(403).json({ message: 'Registration is disabled' })
         }
 
-        const { name, email, password, defaultCurrency } = req.body
+        const { name, email, password, defaultCurrency = 'USD' } = req.body
+
         if (!name || !email || !password) {
             return res.status(400).json({ message: 'All fields are required' })
         }
 
-        const exists = await User.findOne({ email })
-        if (exists) return res.status(400).json({ message: 'User already exists' })
+        const existingUser = await User.findOne({ email })
+        if (existingUser) {
+            return res.status(409).json({ message: 'User already exists' })
+        }
 
+        // 1️⃣ Create user
         const user = await User.create({
             name,
             email,
-            password,
-            defaultCurrency: defaultCurrency || 'USD',
+            passwordHash: password, // hashed via pre-save
+            defaultCurrency,
         })
 
-        // Automatically create default wallet
+        // 2️⃣ Create default wallet (PRIMARY)
         await Wallet.create({
-            user: user._id,
-            currency: user.defaultCurrency,
-            amount: 0,
+            userId: user._id,
+            currency: defaultCurrency,
+            balance: 0,
             status: 'Active',
+            isPrimary: true,
         })
 
         res.status(201).json({
@@ -55,7 +60,10 @@ export const registerUser = async (req, res) => {
         })
     } catch (err) {
         console.error('Register error:', err)
-        res.status(500).json({ message: 'Server error', error: err.message })
+        res.status(500).json({
+            message: 'Server error',
+            error: err.message,
+        })
     }
 }
 
@@ -65,12 +73,14 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
     try {
         if (!userFeatures.loginEnabled) {
-            return res.status(403).json({ message: 'Login is temporarily disabled' })
+            return res.status(403).json({ message: 'Login disabled' })
         }
 
         const { email, password } = req.body
         if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' })
+            return res
+                .status(400)
+                .json({ message: 'Email and password are required' })
         }
 
         const user = await User.findOne({ email })
@@ -84,7 +94,7 @@ export const loginUser = async (req, res) => {
         })
     } catch (err) {
         console.error('Login error:', err)
-        res.status(500).json({ message: 'Server error', error: err.message })
+        res.status(500).json({ message: 'Server error' })
     }
 }
 
@@ -108,9 +118,9 @@ export const updateCurrentUser = async (req, res) => {
         const user = await User.findById(req.user._id)
         if (!user) return res.status(404).json({ message: 'User not found' })
 
-        if (name) user.name = name
-        if (email) user.email = email
-        if (defaultCurrency) user.defaultCurrency = defaultCurrency
+        if (name?.trim()) user.name = name.trim()
+        if (email?.trim()) user.email = email.toLowerCase().trim()
+        if (defaultCurrency?.trim()) user.defaultCurrency = defaultCurrency.toUpperCase()
 
         await user.save()
         res.json({ user: formatUser(user) })

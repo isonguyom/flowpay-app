@@ -1,4 +1,3 @@
-// backend/seeders/seed-users.js
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -9,7 +8,7 @@ import { USER_ROLES, USER_STATUS } from '../helpers/userHelpers.js';
 import { connectDB, disconnectDB } from '../services/db.js';
 
 const seedUsers = async () => {
-    await connectDB(); // use the service file
+    await connectDB();
     console.log('MongoDB connected');
 
     // Clear existing users

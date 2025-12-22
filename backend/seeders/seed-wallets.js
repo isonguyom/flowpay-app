@@ -14,7 +14,7 @@ const seedWallets = async () => {
     // Fetch all users
     const users = await User.find({});
 
-    // Optional: clear existing wallets
+    //clear existing wallets
     await Wallet.deleteMany({});
     console.log('Existing wallets cleared');
 

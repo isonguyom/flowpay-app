@@ -1,6 +1,6 @@
 import Transaction from '../models/Transaction.js'
 import Payment from '../models/Payment.js'
-import { getSocket } from './socket.js' // import your socket service
+import { getSocket } from '../services/socket.js' // import your socket service
 
 /**
  * Process payment result and update related models

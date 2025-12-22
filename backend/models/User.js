@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { isCurrencyAllowed } from '../config/currencies.js';
+import { isCurrencyAllowed } from '../config/currenciesConfig.js';
 import { USER_STATUS, USER_ROLES } from '../helpers/userHelpers.js';
 
 const userSchema = new mongoose.Schema(

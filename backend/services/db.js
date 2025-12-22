@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -12,11 +11,17 @@ if (!MONGO_URI) {
 
 let isConnected = false;
 
-export const connectDB = async () => {
+/**
+ * Connect to MongoDB
+ * @param {object} mongooseInstance - Optional mongoose instance (for testing)
+ */
+export const connectDB = async (mongooseInstance) => {
+    const mongoose = mongooseInstance ?? (await import('mongoose')).default;
+
     if (isConnected) return;
 
     try {
-        await mongoose.connect(MONGO_URI); // no options needed
+        await mongoose.connect(MONGO_URI);
         isConnected = true;
         console.log('✅ MongoDB connected');
     } catch (error) {
@@ -25,7 +30,13 @@ export const connectDB = async () => {
     }
 };
 
-export const disconnectDB = async () => {
+/**
+ * Disconnect from MongoDB
+ * @param {object} mongooseInstance - Optional mongoose instance (for testing)
+ */
+export const disconnectDB = async (mongooseInstance) => {
+    const mongoose = mongooseInstance ?? (await import('mongoose')).default;
+
     if (!isConnected) return;
 
     try {
@@ -35,4 +46,11 @@ export const disconnectDB = async () => {
     } catch (error) {
         console.error('❌ Error disconnecting MongoDB:', error);
     }
+};
+
+/**
+ * Test-only: reset connection state
+ */
+export const __resetConnectionState = () => {
+    isConnected = false;
 };
