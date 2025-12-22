@@ -24,7 +24,7 @@ export const currencies = {
     EUR: { label: 'Euro', symbol: '€', color: '#2563eb', defaultRate: 0.92 },
     GBP: { label: 'British Pound', symbol: '£', color: '#7c3aed', defaultRate: 0.79 },
     CHF: { label: 'Swiss Franc', symbol: 'CHF', color: '#64748b', defaultRate: 0.88 },
-    NGN: { label: 'Nigerian Naira', symbol: '₦', color: '#0ea5e9', defaultRate: 1500, offlineRate: 1500 },
+    // NGN: { label: 'Nigerian Naira', symbol: '₦', color: '#0ea5e9', defaultRate: 1500, offlineRate: 1500 },
     ZAR: { label: 'South African Rand', symbol: 'R', color: '#8b5cf6', defaultRate: 18.5 },
     JPY: { label: 'Japanese Yen', symbol: '¥', color: '#dc2626', defaultRate: 148 },
     KRW: { label: 'South Korean Won', symbol: '₩', color: '#ef4444', defaultRate: 1320 },
