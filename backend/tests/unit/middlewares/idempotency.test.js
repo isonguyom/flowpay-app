@@ -63,7 +63,7 @@ describe('Idempotency Middleware', () => {
 
         expect(IdempotencyKey.create).toHaveBeenCalledWith({
             key: 'new-key',
-            user: req.user._id,
+            userId: req.user?._id,
             endpoint: req.originalUrl,
             response: body,
             statusCode: res.statusCode

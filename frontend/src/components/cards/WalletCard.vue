@@ -62,23 +62,23 @@ const handleWithdraw = () => emit('withdraw', props.wallet)
             </span>
         </div>
 
-        <!-- Wallet Amount & Dollar Equivalent -->
+        <!-- Wallet Balance & Dollar Equivalent -->
         <div class="space-y-1">
             <div
                 class="flex items-center gap-x-2 font-semibold text-xl text-gray-800 dark:text-gray-100 relative w-fit">
-                <span v-if="isVisible">{{ formatCurrencyCompact(wallet.amount, wallet.currency) }}</span>
+                <span v-if="isVisible">{{ formatCurrencyCompact(wallet.balance, wallet.currency) }}</span>
                 <span v-else>•••••</span>
 
                 <button type="button" @click="toggleVisibility" class="absolute inset-y-0 -right-5 flex items-center text-gray-500 dark:text-gray-400 text-sm
                            hover:text-gray-700 dark:hover:text-gray-200
                            focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer"
-                    :aria-label="isVisible ? 'Hide amount' : 'Show amount'" :aria-pressed="isVisible">
+                    :aria-label="isVisible ? 'Hide balance' : 'Show balance'" :aria-pressed="isVisible">
                     <i :class="isVisible ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'" aria-hidden="true" />
                 </button>
             </div>
 
             <p class="text-sm text-gray-500 dark:text-gray-400">
-                ≈ $<span v-if="isVisible">{{ convert(wallet.amount, wallet.currency, 'USD', false) || 0 }}</span>
+                ≈ $<span v-if="isVisible">{{ convert(wallet.balance, wallet.currency, 'USD', false) || 0 }}</span>
                 <span v-else>•••••</span>
             </p>
         </div>

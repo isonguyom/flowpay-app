@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 
 import AppLayout from '@/layouts/AppLayout.vue'
 import ApiSkeleton from '@/components/ui/ApiSkeleton.vue'
@@ -11,24 +12,22 @@ import BaseToast from '@/components/utilities/BaseToast.vue'
 
 import WalletCard from '@/components/cards/WalletCard.vue'
 import TotalWalletBalanceCard from '@/components/cards/TotalWalletBalanceCard.vue'
+import FxChart from '@/components/charts/FxChart.vue'
+import TransactionsList from '@/components/TransactionsList.vue'
 
 import { useTransactionStore } from '@/stores/transactions'
 import { useWalletStore } from '@/stores/wallets'
 import { useAuthStore } from '@/stores/auth'
 import { useFundingAccountsStore } from '@/stores/fundingAccounts'
 import { useUtils } from '@/composables/useUtils'
-import { storeToRefs } from 'pinia'
-import FxChart from '@/components/charts/FxChart.vue'
-import TransactionsList from '@/components/TransactionsList.vue'
 
 // ------------------------
 // Stores & Utils
 // ------------------------
-const transactionStore = useTransactionStore()
 const walletStore = useWalletStore()
+const transactionStore = useTransactionStore()
 const authStore = useAuthStore()
 const fundingAccountsStore = useFundingAccountsStore()
-
 const { user } = storeToRefs(authStore)
 const { gotoRoute } = useUtils()
 
@@ -48,19 +47,8 @@ const submitting = ref(false)
 const toastRef = ref(null)
 const transactionsListRef = ref(null)
 
-// ------------------------
-// Forms
-// ------------------------
-const fundForm = ref({
-    fundingAccount: '',
-    amount: MIN_FUND_AMOUNT,
-})
-
-const withdrawForm = ref({
-    recipient: '',
-    amount: MIN_WITHDRAW_AMOUNT,
-})
-
+const fundForm = ref({ fundingAccount: '', amount: MIN_FUND_AMOUNT })
+const withdrawForm = ref({ recipient: '', amount: MIN_WITHDRAW_AMOUNT })
 const fundErrors = ref({})
 const withdrawErrors = ref({})
 
@@ -68,18 +56,12 @@ const withdrawErrors = ref({})
 // Computed
 // ------------------------
 const totalBalance = computed(() =>
-    walletStore.wallets.reduce(
-        (sum, w) => sum + (Number(w.amount) || 0),
-        0
-    )
+    walletStore.wallets.reduce((sum, w) => sum + (Number(w.balance) || 0), 0)
 )
 
 // ------------------------
 // Helpers
 // ------------------------
-const simulateDelay = (ms = 600) =>
-    new Promise(resolve => setTimeout(resolve, ms))
-
 const resetState = () => {
     selectedWallet.value = null
     fundErrors.value = {}
@@ -91,56 +73,25 @@ const resetState = () => {
 // ------------------------
 const validateFundForm = () => {
     fundErrors.value = {}
-
-    if (!fundForm.value.fundingAccount) {
-        fundErrors.value.fundingAccount = 'Funding account is required.'
-    }
-
-    if (
-        !fundForm.value.amount ||
-        fundForm.value.amount < MIN_FUND_AMOUNT
-    ) {
+    if (!fundForm.value.fundingAccount) fundErrors.value.fundingAccount = 'Funding account is required.'
+    if (!fundForm.value.amount || fundForm.value.amount < MIN_FUND_AMOUNT)
         fundErrors.value.amount = `Minimum amount is ${MIN_FUND_AMOUNT}.`
-    }
-
     return Object.keys(fundErrors.value).length === 0
 }
 
 const validateWithdrawForm = () => {
     withdrawErrors.value = {}
-
-    if (!withdrawForm.value.recipient) {
-        withdrawErrors.value.recipient = 'Recipient is required.'
-    }
-
-    if (
-        !withdrawForm.value.amount ||
-        withdrawForm.value.amount < MIN_WITHDRAW_AMOUNT
-    ) {
+    if (!withdrawForm.value.recipient) withdrawErrors.value.recipient = 'Recipient is required.'
+    if (!withdrawForm.value.amount || withdrawForm.value.amount < MIN_WITHDRAW_AMOUNT)
         withdrawErrors.value.amount = `Minimum amount is ${MIN_WITHDRAW_AMOUNT}.`
-    }
-
     return Object.keys(withdrawErrors.value).length === 0
 }
 
-// ------------------------
-// Auto-clear Errors (UX fix)
-// ------------------------
-watch(() => fundForm.value.fundingAccount, v => {
-    if (v) delete fundErrors.value.fundingAccount
-})
-
-watch(() => fundForm.value.amount, v => {
-    if (v >= MIN_FUND_AMOUNT) delete fundErrors.value.amount
-})
-
-watch(() => withdrawForm.value.recipient, v => {
-    if (v) delete withdrawErrors.value.recipient
-})
-
-watch(() => withdrawForm.value.amount, v => {
-    if (v >= MIN_WITHDRAW_AMOUNT) delete withdrawErrors.value.amount
-})
+// Auto-clear errors
+watch(() => fundForm.value.fundingAccount, v => v && delete fundErrors.value.fundingAccount)
+watch(() => fundForm.value.amount, v => v >= MIN_FUND_AMOUNT && delete fundErrors.value.amount)
+watch(() => withdrawForm.value.recipient, v => v && delete withdrawErrors.value.recipient)
+watch(() => withdrawForm.value.amount, v => v >= MIN_WITHDRAW_AMOUNT && delete withdrawErrors.value.amount)
 
 // ------------------------
 // Modal Actions
@@ -164,28 +115,15 @@ const openWithdrawModal = wallet => {
 // ------------------------
 const confirmFund = async () => {
     if (!validateFundForm() || submitting.value) return
-
     submitting.value = true
     try {
-        await simulateDelay()
-        await walletStore.fundWallet(
-            selectedWallet.value._id,
-            Number(fundForm.value.amount)
-        )
-
-        await Promise.all([
-            walletStore.fetchWallets(),
-            transactionStore.fetchTransactions(),
-        ])
-
+        await walletStore.fundWallet(selectedWallet.value._id, Number(fundForm.value.amount))
+        await Promise.all([walletStore.fetchWallets(), transactionStore.fetchTransactions()])
         toastRef.value.addToast('Wallet funded successfully', 'success')
         showFundModal.value = false
         resetState()
     } catch (err) {
-        toastRef.value.addToast(
-            err?.response?.data?.message || 'Failed to fund wallet',
-            'error'
-        )
+        toastRef.value.addToast(walletStore.error || 'Failed to fund wallet', 'error')
     } finally {
         submitting.value = false
     }
@@ -193,42 +131,24 @@ const confirmFund = async () => {
 
 const confirmWithdraw = async () => {
     if (!validateWithdrawForm() || submitting.value) return
-
     const amount = Number(withdrawForm.value.amount)
-    const balance = Number(selectedWallet.value?.amount || 0)
+    const balance = Number(selectedWallet.value?.balance || 0)
 
-    // 🚫 Client-side insufficient funds guard
     if (amount > balance) {
         withdrawErrors.value.amount = 'Insufficient balance'
-        toastRef.value.addToast(
-            `Available balance: ${balance}`,
-            'error'
-        )
+        toastRef.value.addToast(`Available balance: ${balance}`, 'error')
         return
     }
 
     submitting.value = true
     try {
-        await simulateDelay()
-        await walletStore.withdrawWallet(
-            selectedWallet.value._id,
-            amount
-        )
-
-        await Promise.all([
-            walletStore.fetchWallets(),
-            transactionStore.fetchTransactions(),
-        ])
-
+        await walletStore.withdrawWallet(selectedWallet.value._id, amount, { beneficiary: withdrawForm.value.recipient })
+        await Promise.all([walletStore.fetchWallets(), transactionStore.fetchTransactions()])
         toastRef.value.addToast('Withdrawal successful', 'success')
         showWithdrawModal.value = false
         resetState()
     } catch (err) {
-        toastRef.value.addToast(
-            err?.response?.data?.message ||
-            'Unable to process withdrawal',
-            'error'
-        )
+        toastRef.value.addToast(walletStore.error || 'Unable to process withdrawal', 'error')
     } finally {
         submitting.value = false
     }
@@ -237,11 +157,13 @@ const confirmWithdraw = async () => {
 // ------------------------
 // Lifecycle
 // ------------------------
-onMounted(() => {
-    authStore.fetchMe()
-    walletStore.fetchWallets()
-    transactionStore.fetchTransactions()
-    fundingAccountsStore.fetchFundingAccounts()
+onMounted(async () => {
+    await authStore.fetchMe()
+    await Promise.all([
+        walletStore.fetchWallets(),
+        transactionStore.fetchTransactions(),
+        fundingAccountsStore.fetchFundingAccounts(),
+    ])
 })
 </script>
 
@@ -269,23 +191,17 @@ onMounted(() => {
                 </ApiSkeleton>
             </section>
 
-
             <FxChart />
-
-
 
             <!-- Recent Transactions -->
             <section>
                 <div class="flex justify-between mb-3">
-                    <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        Recent Transactions
-                    </h3>
+                    <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Transactions</h3>
                     <BaseButton v-if="transactionsListRef?.transactions.length > 0" variant="ghost" size="sm"
                         @click="gotoRoute('/transactions')">
                         View all
                     </BaseButton>
                 </div>
-
                 <TransactionsList ref="transactionsListRef" />
             </section>
 
@@ -295,7 +211,6 @@ onMounted(() => {
                 <div class="space-y-4">
                     <BaseSelect label="Funding Account" v-model="fundForm.fundingAccount"
                         :options="fundingAccountsStore.accounts" :error="fundErrors.fundingAccount" />
-
                     <BaseInput label="Amount" type="number" v-model="fundForm.amount" :min="MIN_FUND_AMOUNT" step="0.01"
                         :error="fundErrors.amount" />
                 </div>
@@ -306,13 +221,11 @@ onMounted(() => {
                 @close="showWithdrawModal = false" @confirm="confirmWithdraw">
                 <div class="space-y-4">
                     <BaseInput label="Recipient" v-model="withdrawForm.recipient" :error="withdrawErrors.recipient" />
-
                     <BaseInput label="Amount" type="number" v-model="withdrawForm.amount" :min="MIN_WITHDRAW_AMOUNT"
                         step="0.01" :error="withdrawErrors.amount" />
                 </div>
             </ConfirmModal>
 
-            <!-- Toast -->
             <BaseToast ref="toastRef" />
         </div>
     </AppLayout>

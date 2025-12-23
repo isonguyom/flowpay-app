@@ -1,6 +1,6 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import { handleStripeWebhooks } from '../controllers/webhookController.js';
+import { handleStripeWebhook } from '../controllers/webhookController.js';
 
 const router = express.Router();
 
@@ -8,7 +8,7 @@ const router = express.Router();
 router.post(
     '/stripe',
     bodyParser.raw({ type: 'application/json' }),
-    handleStripeWebhooks
+    handleStripeWebhook
 );
 
 export default router;

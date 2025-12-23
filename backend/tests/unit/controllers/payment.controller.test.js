@@ -1,141 +1,142 @@
-// tests/unit/controllers/payment.controller.test.js
-import mongoose from 'mongoose';
-import { makePayment } from '../../../controllers/paymentController.js';
-import Payment from '../../../models/Payment.js';
-import Transaction from '../../../models/Transaction.js';
-import Wallet from '../../../models/Wallet.js';
-import { getStripe } from '../../../services/stripeService.js';
-import * as helpers from '../../../helpers/paymentControllerHelpers.js';
+import mongoose from 'mongoose'
+import Wallet from '../../../models/Wallet.js'
+import Transaction from '../../../models/Transaction.js'
+import { getStripe } from '../../../services/stripeService.js'
+import * as paymentController from '../../../controllers/paymentController.js'
+import * as helpers from '../../../helpers/paymentControllerHelpers.js'
+import { TRX_TYPE, TRX_STATUS } from '../../../config/transactionConfig.js'
 
-jest.mock('../../../models/Wallet');
-jest.mock('../../../models/Transaction');
-jest.mock('../../../models/Payment');
-jest.mock('../../../services/stripeService');
-jest.mock('../../../helpers/paymentControllerHelpers');
+jest.mock('../../../models/Wallet')
+jest.mock('../../../models/Transaction')
+jest.mock('../../../services/stripeService')
+jest.mock('../../../helpers/paymentControllerHelpers')
 
-describe('makePayment controller', () => {
-    let req, res, next;
-    const mockUserId = new mongoose.Types.ObjectId();
+describe('paymentController.makePayment', () => {
+    let req, res, mockUserId, mockWallet, mockTransaction, mockStripe
 
     beforeEach(() => {
+        mockUserId = new mongoose.Types.ObjectId()
         req = {
             user: { _id: mockUserId },
             body: {
                 beneficiary: 'John Doe',
                 amount: 100,
-                fee: 5,
                 sourceWallet: 'USD',
                 destinationCurrency: 'EUR',
-                fxRate: 1.1,
+                fxRate: 1.2,
+                fee: 5,
             },
-        };
+        }
         res = {
             status: jest.fn().mockReturnThis(),
             json: jest.fn(),
-        };
-        helpers.emit = jest.fn();
-        helpers.rollback = jest.fn();
-        helpers.validatePaymentInput = jest.fn().mockReturnValue({ valid: true, amount: 100, fee: 5 });
+        }
 
-        jest.clearAllMocks();
+        // Socket emit mock
+        helpers.emit.mockClear().mockReturnValue(true)
 
-        // Mock wallet
-        const mockWallet = { _id: new mongoose.Types.ObjectId(), balance: 200, save: jest.fn() };
-        Wallet.findOne = jest.fn().mockResolvedValue(mockWallet);
+        // Wallet mock
+        mockWallet = {
+            _id: new mongoose.Types.ObjectId(),
+            balance: 500,
+            currency: 'USD',
+            save: jest.fn().mockResolvedValue(true),
+        }
+        Wallet.findOne.mockResolvedValue(mockWallet)
 
-        // Mock transaction creation
-        const mockTransaction = { _id: new mongoose.Types.ObjectId(), save: jest.fn() };
-        Transaction.create = jest.fn().mockResolvedValue(mockTransaction);
+        // Transaction mock
+        mockTransaction = {
+            _id: new mongoose.Types.ObjectId(),
+            save: jest.fn().mockResolvedValue(true),
+        }
+        Transaction.create.mockResolvedValue(mockTransaction)
 
-        // Mock payment creation
-        const mockPayment = { _id: new mongoose.Types.ObjectId() };
-        Payment.create = jest.fn().mockResolvedValue(mockPayment);
+        // Stripe mock
+        mockStripe = { paymentIntents: { create: jest.fn().mockResolvedValue({ client_secret: 'pi_secret_123' }) } }
+        getStripe.mockReturnValue(mockStripe)
 
-        // Save these for assertions
-        global.mockWallet = mockWallet;
-        global.mockTransaction = mockTransaction;
-        global.mockPayment = mockPayment;
-    });
+        // Input validation
+        helpers.validatePaymentInput.mockImplementation(({ amount, fee }) => ({
+            valid: true,
+            amount,
+            fee,
+        }))
 
-    afterEach(() => {
-        jest.clearAllMocks();
-    });
+        helpers.rollback.mockClear()
+    })
 
     it('should return 401 if user is not authenticated', async () => {
-        req.user = null;
-        await makePayment(req, res);
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith({ message: 'Unauthorized' });
-    });
+        req.user = null
+        await paymentController.makePayment(req, res)
+        expect(res.status).toHaveBeenCalledWith(401)
+        expect(res.json).toHaveBeenCalledWith({ message: 'Unauthorized' })
+    })
 
-    it('should return 400 if input validation fails', async () => {
-        helpers.validatePaymentInput.mockReturnValue({ valid: false, message: 'Invalid fee' });
-        await makePayment(req, res);
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({ message: 'Invalid fee' });
-    });
+    it('should return 400 if validation fails', async () => {
+        helpers.validatePaymentInput.mockReturnValue({ valid: false, message: 'Invalid input' })
+        await paymentController.makePayment(req, res)
+        expect(res.status).toHaveBeenCalledWith(400)
+        expect(res.json).toHaveBeenCalledWith({ message: 'Invalid input' })
+    })
 
     it('should return 404 if wallet not found', async () => {
-        Wallet.findOne.mockResolvedValue(null);
-        await makePayment(req, res);
-        expect(res.status).toHaveBeenCalledWith(404);
-        expect(res.json).toHaveBeenCalledWith({ message: 'Wallet (USD) not found' });
-    });
+        Wallet.findOne.mockResolvedValue(null)
+        await paymentController.makePayment(req, res)
+        expect(res.status).toHaveBeenCalledWith(404)
+        expect(res.json).toHaveBeenCalledWith({ message: 'Wallet (USD) not found' })
+    })
 
-    it('should return 400 if wallet balance is insufficient', async () => {
-        Wallet.findOne.mockResolvedValue({ _id: mockUserId, balance: 50, save: jest.fn() });
-        await makePayment(req, res);
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({ message: 'Insufficient wallet balance' });
-    });
+    it('should return 400 if insufficient wallet balance', async () => {
+        mockWallet.balance = 50
+        await paymentController.makePayment(req, res)
+        expect(res.status).toHaveBeenCalledWith(400)
+        expect(res.json).toHaveBeenCalledWith({ message: 'Insufficient wallet balance' })
+    })
 
-    it('should create transaction and respond with client secret', async () => {
-        // Mock wallet
-        const mockWallet = { _id: mockUserId, balance: 200, save: jest.fn().mockResolvedValue(true) };
-        Wallet.findOne.mockResolvedValue(mockWallet);
+    it('should create transaction, reserve balance, create stripe intent, and respond with client secret', async () => {
+        await paymentController.makePayment(req, res)
 
-        // Mock transaction
-        const mockTransaction = { _id: new mongoose.Types.ObjectId(), save: jest.fn().mockResolvedValue(true) };
-        Transaction.create.mockResolvedValue(mockTransaction);
+        // Check wallet balance deducted
+        expect(mockWallet.balance).toBe(500 - (100 + 5))
+        expect(mockWallet.save).toHaveBeenCalled()
 
-        // Mock Stripe
-        const mockPaymentIntent = { id: 'pi_123', client_secret: 'secret_123' };
-        getStripe.mockReturnValue({
-            paymentIntents: { create: jest.fn().mockResolvedValue(mockPaymentIntent) },
-        });
+        // Transaction creation
+        expect(Transaction.create).toHaveBeenCalledWith(expect.objectContaining({
+            userId: mockUserId,
+            type: TRX_TYPE.PAYMENT,
+            amount: 100,
+            fee: 5,
+            sourceCurrency: 'USD',
+            destinationCurrency: 'EUR',
+            fxRate: 1.2,
+            status: TRX_STATUS.PENDING,
+        }))
+        expect(mockTransaction.save).toHaveBeenCalled()
 
-        // Call the controller
-        await makePayment(req, res);
+        // Stripe payment intent
+        expect(mockStripe.paymentIntents.create).toHaveBeenCalledWith(expect.objectContaining({
+            amount: 10000, // amount * 100
+            currency: 'eur',
+            metadata: expect.objectContaining({ transactionId: mockTransaction._id.toString() }),
+        }))
 
-        // -------------------- Assertions --------------------
+        // Socket emits
+        expect(helpers.emit).toHaveBeenCalledWith(mockUserId, 'transactionCreated', mockTransaction)
+        expect(helpers.emit).toHaveBeenCalledWith(mockUserId, 'walletUpdated', mockWallet)
 
-        // Transaction was created
-        expect(Transaction.create).toHaveBeenCalledTimes(1);
-
-        // Wallet balance was updated
-        expect(mockWallet.balance).toBe(95); // 200 - (100 + 5)
-
-        // Transaction.save was called
-        expect(mockTransaction.save).toHaveBeenCalled();
-
-        // Response sent with correct client secret
-        expect(res.status).toHaveBeenCalledWith(201);
+        // Response
+        expect(res.status).toHaveBeenCalledWith(201)
         expect(res.json).toHaveBeenCalledWith({
             transactionId: mockTransaction._id,
-            clientSecret: 'secret_123',
-        });
-    });
+            clientSecret: 'pi_secret_123',
+        })
+    })
 
-
-
-    it('should rollback on error', async () => {
-        Wallet.findOne.mockResolvedValue({ _id: mockUserId, balance: 200, save: jest.fn() });
-        Transaction.create.mockRejectedValue(new Error('DB error'));
-
-        await makePayment(req, res);
-
-        expect(helpers.rollback).toHaveBeenCalled();
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith({ message: 'Payment initiation failed' });
-    });
-});
+    it('should rollback and return 500 if an error occurs', async () => {
+        Wallet.findOne.mockImplementation(() => { throw new Error('DB failure') })
+        await paymentController.makePayment(req, res)
+        expect(helpers.rollback).toHaveBeenCalled()
+        expect(res.status).toHaveBeenCalledWith(500)
+        expect(res.json).toHaveBeenCalledWith({ message: 'Payment initiation failed' })
+    })
+})

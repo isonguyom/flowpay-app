@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
     // ------------------------
     const user = ref(JSON.parse(localStorage.getItem('user')) || null)
     const token = ref(localStorage.getItem('token') || null)
+    const wallets = ref(JSON.parse(localStorage.getItem('wallets')) || [])
     const loading = ref(false)
     const error = ref(null)
 
@@ -32,9 +33,12 @@ export const useAuthStore = defineStore('auth', () => {
 
             user.value = res.data.user
             token.value = res.data.token
+            wallets.value = res.data.wallet ? [res.data.wallet] : []
 
             localStorage.setItem('user', JSON.stringify(user.value))
             localStorage.setItem('token', token.value)
+            localStorage.setItem('wallets', JSON.stringify(wallets.value))
+
             return true
         } catch (err) {
             console.error('Register error:', err)
@@ -59,8 +63,16 @@ export const useAuthStore = defineStore('auth', () => {
             user.value = res.data.user
             token.value = res.data.token
 
+            // Fetch wallets immediately after login
+            const walletRes = await api.get('/wallets', {
+                headers: { Authorization: `Bearer ${token.value}` },
+            })
+            wallets.value = walletRes.data.wallets || []
+
             localStorage.setItem('user', JSON.stringify(user.value))
             localStorage.setItem('token', token.value)
+            localStorage.setItem('wallets', JSON.stringify(wallets.value))
+
             return true
         } catch (err) {
             console.error('Login error:', err)
@@ -85,6 +97,13 @@ export const useAuthStore = defineStore('auth', () => {
             })
             user.value = res.data
             localStorage.setItem('user', JSON.stringify(res.data))
+
+            // Fetch wallets
+            const walletRes = await api.get('/wallets', {
+                headers: { Authorization: `Bearer ${token.value}` },
+            })
+            wallets.value = walletRes.data.wallets || []
+            localStorage.setItem('wallets', JSON.stringify(wallets.value))
         } catch (err) {
             console.error('Fetch profile error:', err)
             logout()
@@ -126,8 +145,10 @@ export const useAuthStore = defineStore('auth', () => {
             await simulateDelay(500)
             user.value = null
             token.value = null
+            wallets.value = []
             localStorage.removeItem('user')
             localStorage.removeItem('token')
+            localStorage.removeItem('wallets')
             return true
         } finally {
             loading.value = false
@@ -142,6 +163,7 @@ export const useAuthStore = defineStore('auth', () => {
     return {
         user,
         token,
+        wallets,
         loading,
         error,
         register,

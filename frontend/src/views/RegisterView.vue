@@ -4,10 +4,11 @@ import BaseInput from '@/components/utilities/BaseInput.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
 import { useAuthStore } from '@/stores/auth'
-
+import { useWalletStore } from '@/stores/wallets'
 import { useUtils } from '@/composables/useUtils'
 
 const authStore = useAuthStore()
+const walletStore = useWalletStore()
 const { gotoRoute } = useUtils()
 
 let nameTimeout, emailTimeout, passwordTimeout
@@ -74,13 +75,15 @@ const register = async () => {
 
     loading.value = true
     try {
+        // Register the user
         const success = await authStore.register(form.value.name, form.value.email, form.value.password)
 
         if (success) {
-            gotoRoute('/dashboard') // Only redirect if registration was successful
+            // Redirect to dashboard
+            gotoRoute('/dashboard')
         }
     } catch (err) {
-        errors.value.email
+        console.error('Register component error:', err)
     } finally {
         loading.value = false
     }

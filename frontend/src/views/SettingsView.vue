@@ -142,6 +142,8 @@ onMounted(async () => {
             <!-- Header -->
             <PageHeader title="Settings" subtitle="Manage your account preferences" />
 
+            {{authStore.user.id}}
+
             <!-- Account Settings -->
             <form @submit.prevent="saveSettings" class="space-y-6">
                 <BaseInput label="Name" v-model="settings.userName" :error="errors.userName" />

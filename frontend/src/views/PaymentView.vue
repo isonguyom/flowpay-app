@@ -13,161 +13,177 @@ import BaseToast from '@/components/utilities/BaseToast.vue'
 import { useFxStore } from '@/stores/fx'
 import { usePaymentStore } from '@/stores/payment'
 import { useWalletStore } from '@/stores/wallets'
-import { useTransactionStore } from '@/stores/transactions'
-
-import { useFx } from '@/composables/useFx'
 import { useUtils } from '@/composables/useUtils'
+import { useFx } from '@/composables/useFx'
 
-const paymentStore = usePaymentStore()
+/* ---------------------------------
+   Stores & composables
+---------------------------------- */
 const fxStore = useFxStore()
 const walletStore = useWalletStore()
-const transactionStore = useTransactionStore()
+const paymentStore = usePaymentStore()
 
 const { fxList, feeRate, loading: fxLoading } = storeToRefs(fxStore)
 const { wallets, loading: walletsLoading } = storeToRefs(walletStore)
-const { flow } = storeToRefs(paymentStore)
+const { loading: paymentLoading, flow } = storeToRefs(paymentStore)
 
 const { calculateFee, convert } = useFx({ feeRate })
 const { gotoRoute } = useUtils()
 
-// ------------------------
-// Constants
-// ------------------------
+/* ---------------------------------
+   Constants
+---------------------------------- */
 const SETTLEMENT_CURRENCY = 'USD'
-const MIN_SETTLEMENT_AMOUNT = 0.5 // $0.50 minimum
+const MIN_SETTLEMENT_USD = 0.5
+const MIN_AMOUNT = 1
 
-// ------------------------
-// UI & Form State
-// ------------------------
-const loading = ref(false)
+/* ---------------------------------
+   UI state
+---------------------------------- */
 const showConfirmModal = ref(false)
 const toastRef = ref(null)
-const minAmount = 1
 
+/* ---------------------------------
+   Form state
+---------------------------------- */
 const payment = ref({
     beneficiary: '',
     amount: '',
-    sourceWallet: '',
-    destinationCurrency: '',
+    sourceCurrency: '',
+    destinationCurrency: ''
 })
 
 const touched = ref({
     beneficiary: false,
     amount: false,
-    sourceWallet: false,
-    destinationCurrency: false,
+    sourceCurrency: false,
+    destinationCurrency: false
 })
 
 const errors = ref({})
 
-// ------------------------
-// Computed
-// ------------------------
+/* ---------------------------------
+   Derived state
+---------------------------------- */
+const amountNumber = computed(() => Number(payment.value.amount || 0))
+
 const selectedWallet = computed(() =>
-    wallets.value.find(w => w.currency === payment.value.sourceWallet)
+    wallets.value.find(w => w.currency === payment.value.sourceCurrency)
 )
 
 const fee = computed(() =>
-    payment.value.amount ? calculateFee(payment.value.amount) : 0
+    amountNumber.value > 0 ? calculateFee(amountNumber.value) : 0
 )
 
-const totalAmount = computed(() =>
-    Number(payment.value.amount || 0) + Number(fee.value)
+const totalDebit = computed(() =>
+    amountNumber.value + fee.value
 )
 
 const hasSufficientBalance = computed(() =>
-    selectedWallet.value ? totalAmount.value <= selectedWallet.value.amount : false
+    selectedWallet.value
+        ? totalDebit.value <= selectedWallet.value.balance
+        : false
 )
 
-const fxRate = computed(() =>
-    payment.value.sourceWallet && payment.value.destinationCurrency
-        ? fxStore.getExchangeRate(payment.value.sourceWallet, payment.value.destinationCurrency)
-        : null
-)
+const fxRate = computed(() => {
+    if (!payment.value.sourceCurrency || !payment.value.destinationCurrency) return null
+    return fxStore.getExchangeRate(
+        payment.value.sourceCurrency,
+        payment.value.destinationCurrency
+    )
+})
 
 const convertedAmount = computed(() =>
-    payment.value.amount && fxRate.value
-        ? convert(payment.value.amount, payment.value.sourceWallet, payment.value.destinationCurrency)
+    fxRate.value
+        ? convert(
+            amountNumber.value,
+            payment.value.sourceCurrency,
+            payment.value.destinationCurrency
+        )
         : 0
 )
 
-const settlementInUSD = computed(() =>
-    payment.value.amount && payment.value.sourceWallet
-        ? convert(payment.value.amount, payment.value.sourceWallet, SETTLEMENT_CURRENCY)
-        : 0
-)
+const settlementUSD = computed(() => {
+    const usdRate = fxStore.getExchangeRate(
+        payment.value.sourceCurrency,
+        SETTLEMENT_CURRENCY
+    )
+    return usdRate ? amountNumber.value * usdRate : 0
+})
 
 const meetsSettlementMinimum = computed(() =>
-    settlementInUSD.value >= MIN_SETTLEMENT_AMOUNT
+    settlementUSD.value >= MIN_SETTLEMENT_USD
 )
 
 const sourceWalletOptions = computed(() =>
     wallets.value.map(w => ({
-        label: `${w.currency} (Balance: ${w.amount})`,
-        value: w.currency,
+        label: `${w.currency} (Balance: ${w.balance})`,
+        value: w.currency
     }))
 )
 
 const isFormValid = computed(() =>
     payment.value.beneficiary &&
-    Number(payment.value.amount) > 0 &&
-    payment.value.sourceWallet &&
+    amountNumber.value > 0 &&
+    payment.value.sourceCurrency &&
     payment.value.destinationCurrency &&
     fxRate.value &&
     hasSufficientBalance.value &&
     meetsSettlementMinimum.value
 )
 
-// ------------------------
-// Validation
-// ------------------------
+/* ---------------------------------
+   Validation
+---------------------------------- */
 const validate = () => {
-    const amount = Number(payment.value.amount || 0)
-    const walletBalance = selectedWallet.value?.amount || 0
-    const total = totalAmount.value
+    const walletBalance = selectedWallet.value?.balance ?? 0
+    const usdRate = fxStore.getExchangeRate(
+        payment.value.sourceCurrency,
+        SETTLEMENT_CURRENCY
+    )
 
     errors.value = {
-        beneficiary: touched.value.beneficiary && !payment.value.beneficiary ? 'Beneficiary is required' : null,
-        amount: touched.value.amount
-            ? amount <= 0
-                ? 'Amount must be greater than 0'
-                : total > walletBalance
-                    ? `Amount + fee exceeds wallet balance (${walletBalance})`
-                    : !meetsSettlementMinimum.value
-                        ? `Minimum payment is ${MIN_SETTLEMENT_AMOUNT} USD (~${Math.ceil(
-                            MIN_SETTLEMENT_AMOUNT / fxStore.getExchangeRate(payment.value.sourceWallet, 'USD')
-                        )} ${payment.value.sourceWallet})`
-                        : null
-            : null,
-        sourceWallet: touched.value.sourceWallet && !payment.value.sourceWallet ? 'Select a source currency' : null,
-        destinationCurrency: touched.value.destinationCurrency && !payment.value.destinationCurrency ? 'Select a destination currency' : null,
+        beneficiary:
+            touched.value.beneficiary && !payment.value.beneficiary
+                ? 'Beneficiary is required'
+                : null,
+
+        amount:
+            touched.value.amount
+                ? amountNumber.value <= 0
+                    ? 'Amount must be greater than zero'
+                    : totalDebit.value > walletBalance
+                        ? 'Amount + fee exceeds wallet balance'
+                        : !meetsSettlementMinimum.value && usdRate
+                            ? `Minimum payment is ${MIN_SETTLEMENT_USD} USD (~${Math.ceil(
+                                MIN_SETTLEMENT_USD / usdRate
+                            )} ${payment.value.sourceCurrency})`
+                            : null
+                : null,
+
+        sourceCurrency:
+            touched.value.sourceCurrency && !payment.value.sourceCurrency
+                ? 'Select a source wallet'
+                : null,
+
+        destinationCurrency:
+            touched.value.destinationCurrency && !payment.value.destinationCurrency
+                ? 'Select a destination currency'
+                : null
     }
 }
 
 watch(payment, validate, { deep: true })
 
-// ------------------------
-// Handlers
-// ------------------------
+/* ---------------------------------
+   Actions
+---------------------------------- */
 const confirmPayment = () => {
     Object.keys(touched.value).forEach(k => (touched.value[k] = true))
     validate()
 
-    if (!meetsSettlementMinimum.value) {
-        toastRef.value?.addToast(
-            `Minimum payment is ${MIN_SETTLEMENT_AMOUNT} USD (~${Math.ceil(
-                MIN_SETTLEMENT_AMOUNT / fxStore.getExchangeRate(payment.value.sourceWallet, 'USD')
-            )} ${payment.value.sourceWallet})`,
-            'error'
-        )
-        return
-    }
-
     if (!isFormValid.value) {
-        toastRef.value?.addToast(
-            !hasSufficientBalance.value ? 'Total amount including fee exceeds wallet balance' : 'Please fix the form errors',
-            'error'
-        )
+        toastRef.value?.addToast('Please fix the form errors', 'error')
         return
     }
 
@@ -175,87 +191,58 @@ const confirmPayment = () => {
 }
 
 const makePayment = async () => {
-    loading.value = true
     try {
-        const payload = {
+
+        console.log('Making payment with data:', {
             beneficiary: payment.value.beneficiary,
-            amount: Number(payment.value.amount),
-            sourceWallet: payment.value.sourceWallet,
+            amount: amountNumber.value,
+            sourceWallet: payment.value.sourceCurrency.toUpperCase(),
             destinationCurrency: payment.value.destinationCurrency,
             fxRate: fxRate.value,
-            fee: fee.value,
-            settlementAmount: convertedAmount.value, // already computed
-        }
-
-        const { transactionId } = await paymentStore.makePayment(payload)
-
-        transactionStore.addTransaction({
-            _id: transactionId,
-            user: { _id: null },
-            type: 'PAYMENT',
-            fundingAccount: payment.value.sourceWallet,
+            fee: fee.value
+        })
+        await paymentStore.makePayment({
             beneficiary: payment.value.beneficiary,
-            amount: Number(payment.value.amount) || 0,
-            settlementAmount: convertedAmount.value || 0,
-            fee: Number(fee.value) || 0,
-            sourceCurrency: payment.value.sourceWallet,
+            amount: amountNumber.value,
+            sourceWallet: payment.value.sourceCurrency.toUpperCase(),
             destinationCurrency: payment.value.destinationCurrency,
-            fxRate: Number(fxRate.value) || 0,
-            status: 'Pending',
-            createdAt: new Date().toISOString(),
+            fxRate: fxRate.value,
+            fee: fee.value
         })
 
+
         toastRef.value?.addToast('Payment submitted successfully', 'success')
-        await new Promise(resolve => setTimeout(resolve, 1200))
+        await new Promise(r => setTimeout(r, 800))
         gotoRoute('/transactions')
-
-        // Reset form
-        paymentStore.reset()
-        payment.value = {
-            beneficiary: '',
-            amount: '',
-            sourceWallet: wallets.value[0]?.currency || '',
-            destinationCurrency: fxList.value.find(c => c.value !== wallets.value[0]?.currency)?.value || ''
-        }
-        Object.keys(touched.value).forEach(k => (touched.value[k] = false))
-
-    } catch (err) {
-        toastRef.value?.addToast(paymentStore.error || 'Payment failed. Please try again.', 'error')
+    } catch {
+        toastRef.value?.addToast(
+            paymentStore.error || 'Payment failed',
+            'error'
+        )
     } finally {
-        loading.value = false
         showConfirmModal.value = false
     }
 }
 
-// ------------------------
-// Watchers
-// ------------------------
-watch(
-    () => payment.value.sourceWallet,
-    newCurrency => {
-        if (payment.value.destinationCurrency === newCurrency) {
-            payment.value.destinationCurrency =
-                fxList.value.find(c => c.value !== newCurrency)?.value || ''
-        }
-    }
-)
-
-// ------------------------
-// Init
-// ------------------------
+/* ---------------------------------
+   Init
+---------------------------------- */
 onMounted(async () => {
     try {
-        await Promise.all([walletStore.fetchWallets(), fxStore.fetchFx()])
+        await Promise.all([
+            walletStore.fetchWallets(),
+            fxStore.fetchFx()
+        ])
 
         if (!wallets.value.length) {
             toastRef.value?.addToast('No wallets available', 'error')
             return
         }
 
-        payment.value.sourceWallet = wallets.value[0].currency
+        payment.value.sourceCurrency = wallets.value[0].currency
         payment.value.destinationCurrency =
             fxList.value.find(c => c.value !== wallets.value[0].currency)?.value || ''
-    } catch (err) {
+    } catch {
         toastRef.value?.addToast('Failed to load payment data', 'error')
     }
 })
@@ -269,7 +256,7 @@ onMounted(async () => {
             <div v-if="flow === 'new'"
                 class="p-4 rounded-xl bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-800">
                 <p class="text-green-700 dark:text-green-200 font-medium flex items-center gap-2">
-                    <i class="bi bi-rocket-takeoff text-light text-2xl"></i>
+                    <i class="bi bi-rocket-takeoff text-2xl"></i>
                     You are using the NEW payment flow!
                 </p>
             </div>
@@ -279,56 +266,57 @@ onMounted(async () => {
                     :error="errors.beneficiary" @blur="touched.beneficiary = true" />
 
                 <BaseInput label="Payment Amount" type="number" placeholder="0.00" v-model="payment.amount"
-                    :min="minAmount" :error="errors.amount" @blur="touched.amount = true" />
+                    :min="MIN_AMOUNT" :error="errors.amount" @blur="touched.amount = true" />
 
                 <div class="grid grid-cols-2 gap-4">
-                    <BaseSelect label="Source Wallet" v-model="payment.sourceWallet" :options="sourceWalletOptions"
-                        :loading="walletsLoading" :error="errors.sourceWallet" @change="touched.sourceWallet = true" />
+                    <BaseSelect label="Source Wallet" v-model="payment.sourceCurrency" :options="sourceWalletOptions"
+                        :loading="walletsLoading" :error="errors.sourceCurrency"
+                        @change="touched.sourceCurrency = true" />
+
                     <BaseSelect label="Destination Currency" v-model="payment.destinationCurrency" :options="fxList"
                         :loading="fxLoading" :error="errors.destinationCurrency"
                         @change="touched.destinationCurrency = true" />
                 </div>
 
-                <div v-if="fxRate && payment.amount"
-                    class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 text-sm space-y-2">
+                <div v-if="fxRate && amountNumber"
+                    class="rounded-xl border bg-gray-50 dark:bg-gray-900 p-4 text-sm space-y-2">
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Exchange rate</span>
-                        <span class="font-medium">
-                            1 {{ payment.sourceWallet }} = {{ fxRate }} {{ payment.destinationCurrency }}
+                        <span>Exchange rate</span>
+                        <span>
+                            1 {{ payment.sourceCurrency }} = {{ fxRate }} {{ payment.destinationCurrency }}
                         </span>
                     </div>
 
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Processing fee</span>
-                        <span class="font-medium">{{ fee.toFixed(2) }} {{ payment.sourceWallet }}</span>
+                        <span>Processing fee</span>
+                        <span>{{ fee.toFixed(2) }} {{ payment.sourceCurrency }}</span>
                     </div>
 
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Total</span>
-                        <span class="font-medium">{{ totalAmount.toFixed(2) }} {{ payment.sourceWallet }}</span>
+                        <span>Total</span>
+                        <span>{{ totalDebit.toFixed(2) }} {{ payment.sourceCurrency }}</span>
                     </div>
 
-                    <div class="flex justify-between pt-2 border-t dark:border-gray-800">
-                        <span class="text-gray-700 dark:text-gray-300">Beneficiary receives</span>
-                        <span class="font-semibold text-gray-900 dark:text-gray-100">
+                    <div class="flex justify-between pt-2 border-t">
+                        <span>Beneficiary receives</span>
+                        <span class="font-semibold">
                             {{ convertedAmount }} {{ payment.destinationCurrency }}
                         </span>
                     </div>
                 </div>
 
                 <BaseButton type="submit" fullWidth :disabled="!isFormValid || fxLoading || walletsLoading"
-                    :loading="loading">
+                    :loading="paymentLoading">
                     Confirm Payment
                 </BaseButton>
             </form>
 
-            <ConfirmModal :show="showConfirmModal" title="Confirm Payment" :loading="loading"
+            <ConfirmModal :show="showConfirmModal" title="Confirm Payment" :loading="paymentLoading"
                 @close="showConfirmModal = false" @confirm="makePayment">
                 <p>
                     You are about to send
-                    <strong>{{ payment.amount }} {{ payment.sourceWallet }}</strong> to
-                    <strong>{{ payment.beneficiary }}</strong>. The beneficiary will receive
-                    <strong>{{ convertedAmount }} {{ payment.destinationCurrency }}</strong>.
+                    <strong>{{ payment.amount }} {{ payment.sourceCurrency }}</strong>
+                    to <strong>{{ payment.beneficiary }}</strong>.
                 </p>
             </ConfirmModal>
 

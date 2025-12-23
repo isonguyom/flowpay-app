@@ -1,259 +1,211 @@
-import { jest } from '@jest/globals'
-
-import {
-    createWallet,
-    getWallets,
-    fundWallet,
-    withdrawFromWallet,
-} from '../../../controllers/walletController.js'
-
+import mongoose from 'mongoose'
 import Wallet from '../../../models/Wallet.js'
 import Transaction from '../../../models/Transaction.js'
-import { getSocket } from '../../../services/socket.js'
+import * as walletController from '../../../controllers/walletController.js'
+import { emit } from '../../../helpers/walletControllerHelpers.js'
+import { TRX_TYPE, TRX_STATUS } from '../../../config/transactionConfig.js'
 
-// -----------------------------
-// Mocks
-// -----------------------------
-jest.mock('../../../models/Wallet.js')
-jest.mock('../../../models/Transaction.js')
-jest.mock('../../../services/socket.js')
+jest.mock('../../../models/Wallet')
+jest.mock('../../../models/Transaction')
+jest.mock('../../../helpers/walletControllerHelpers.js')
 
-// -----------------------------
-// Helpers
-// -----------------------------
-const mockEmit = jest.fn()
-const mockTo = jest.fn(() => ({ emit: mockEmit }))
+describe('walletController', () => {
+  let req, res, userId, mockWallet, mockTransaction
 
-const mockSocket = {
-    to: mockTo,
-}
+  beforeEach(() => {
+    userId = new mongoose.Types.ObjectId()
+    req = { user: { _id: userId }, body: {} }
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn() }
 
-const mockRes = () => {
-    const res = {}
-    res.status = jest.fn().mockReturnValue(res)
-    res.json = jest.fn().mockReturnValue(res)
-    return res
-}
+    mockWallet = { 
+      _id: new mongoose.Types.ObjectId(), 
+      balance: 100, 
+      currency: 'USD', 
+      status: 'Active', 
+      save: jest.fn().mockResolvedValue(true) 
+    }
 
-const mockWallet = {
-    _id: 'wallet123',
-    userId: 'user123',
-    currency: 'USD',
-    balance: 100,
-    status: 'Active',
-    save: jest.fn(),
-}
+    mockTransaction = { 
+      _id: new mongoose.Types.ObjectId(), 
+      status: TRX_STATUS.PENDING, 
+      save: jest.fn().mockResolvedValue(true) 
+    }
 
-const mockTransaction = {
-    _id: 'txn123',
-    status: 'Pending',
-    save: jest.fn(),
-}
-
-beforeEach(() => {
+    emit.mockClear()
     jest.clearAllMocks()
-    getSocket.mockReturnValue(mockSocket)
-})
+  })
 
-/* =====================================================
-   CREATE WALLET
-===================================================== */
-describe('createWallet', () => {
-    it('should create a wallet and emit socket event', async () => {
-        Wallet.findOne.mockResolvedValue(null)
-        Wallet.create.mockResolvedValue(mockWallet)
-
-        const req = {
-            user: { _id: 'user123' },
-            body: { currency: 'USD' },
-        }
-        const res = mockRes()
-
-        await createWallet(req, res)
-
-        expect(Wallet.findOne).toHaveBeenCalledWith({
-            userId: 'user123',
-            currency: 'USD',
-        })
-        expect(Wallet.create).toHaveBeenCalled()
-        expect(res.status).toHaveBeenCalledWith(201)
-        expect(mockEmit).toHaveBeenCalledWith('walletCreated', mockWallet)
+  // ---------------- CREATE WALLET ----------------
+  describe('createWallet', () => {
+    it('returns 401 if user not authenticated', async () => {
+      req.user = null
+      await walletController.createWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(401)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Unauthorized' })
     })
 
-    it('should return 409 if wallet already exists', async () => {
-        Wallet.findOne.mockResolvedValue(mockWallet)
-
-        const req = {
-            user: { _id: 'user123' },
-            body: { currency: 'USD' },
-        }
-        const res = mockRes()
-
-        await createWallet(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(409)
-        expect(res.json).toHaveBeenCalledWith({
-            message: 'Wallet for USD already exists',
-        })
+    it('returns 400 if currency not provided', async () => {
+      req.body = {}
+      await walletController.createWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(400)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Currency is required' })
     })
 
-    it('should return 400 if currency is missing', async () => {
-        const req = { user: { _id: 'user123' }, body: {} }
-        const res = mockRes()
-
-        await createWallet(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(400)
-    })
-})
-
-/* =====================================================
-   GET WALLETS
-===================================================== */
-describe('getWallets', () => {
-    it('should fetch user wallets', async () => {
-        Wallet.find.mockReturnValue({
-            sort: jest.fn().mockResolvedValue([mockWallet]),
-        })
-
-        const req = { user: { _id: 'user123' } }
-        const res = mockRes()
-
-        await getWallets(req, res)
-
-        expect(Wallet.find).toHaveBeenCalledWith({ userId: 'user123' })
-        expect(res.json).toHaveBeenCalledWith({
-            wallets: [mockWallet],
-        })
-    })
-})
-
-/* =====================================================
-   FUND WALLET
-===================================================== */
-describe('fundWallet', () => {
-    it('should fund wallet and create transaction', async () => {
-        Wallet.findOne.mockResolvedValue(mockWallet)
-        Transaction.create.mockResolvedValue(mockTransaction)
-
-        const req = {
-            user: { _id: 'user123' },
-            body: { walletId: 'wallet123', amount: 50 },
-        }
-        const res = mockRes()
-
-        await fundWallet(req, res)
-
-        expect(mockWallet.balance).toBe(150)
-        expect(mockWallet.save).toHaveBeenCalled()
-        expect(Transaction.create).toHaveBeenCalled()
-        expect(mockEmit).toHaveBeenCalledWith('walletUpdated', mockWallet)
+    it('returns 409 if wallet already exists', async () => {
+      req.body = { currency: 'USD' }
+      Wallet.findOne.mockResolvedValue(mockWallet)
+      await walletController.createWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(409)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Wallet for USD already exists' })
     })
 
-    it('should return 400 for invalid amount', async () => {
-        const req = {
-            user: { _id: 'user123' },
-            body: { walletId: 'wallet123', amount: -10 },
-        }
-        const res = mockRes()
+    it('creates wallet successfully', async () => {
+      req.body = { currency: 'USD' }
+      Wallet.findOne.mockResolvedValue(null)
+      Wallet.create.mockResolvedValue(mockWallet)
 
-        await fundWallet(req, res)
+      await walletController.createWallet(req, res)
 
-        expect(res.status).toHaveBeenCalledWith(400)
+      expect(Wallet.create).toHaveBeenCalledWith({
+        userId,
+        currency: 'USD',
+        balance: 0,
+        status: 'Active',
+      })
+      expect(emit).toHaveBeenCalledWith(userId, 'walletCreated', mockWallet)
+      expect(res.status).toHaveBeenCalledWith(201)
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Wallet created successfully',
+        wallet: mockWallet,
+      })
     })
+  })
 
-    it('should return 404 if wallet not found', async () => {
-        Wallet.findOne.mockResolvedValue(null)
-
-        const req = {
-            user: { _id: 'user123' },
-            body: { walletId: 'wallet123', amount: 10 },
-        }
-        const res = mockRes()
-
-        await fundWallet(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(404)
-    })
-})
-
-/* =====================================================
-   WITHDRAW FROM WALLET
-===================================================== */
-describe('withdrawFromWallet', () => {
+  // ---------------- FUND WALLET ----------------
+  describe('fundWallet', () => {
     beforeEach(() => {
-        jest.useFakeTimers()
+      req.body = { walletId: mockWallet._id, amount: 50 }
+      Wallet.findOne.mockResolvedValue(mockWallet)
+      Transaction.create.mockResolvedValue(mockTransaction)
     })
 
-    afterEach(() => {
-        jest.useRealTimers()
+    it('returns 401 if user not authenticated', async () => {
+      req.user = null
+      await walletController.fundWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(401)
     })
 
-  it('should withdraw from wallet and complete transaction', async () => {
-    const wallet = {
-        ...mockWallet,
-        balance: 100,   // make sure property matches your controller (balance, not amount)
-        save: jest.fn(),
-    }
-
-    Wallet.findOne.mockResolvedValue(wallet)
-    const transaction = { ...mockTransaction, save: jest.fn() }
-    Transaction.create.mockResolvedValue(transaction)
-
-    const req = {
-        user: { _id: 'user123' },
-        body: {
-            walletId: 'wallet123',
-            amount: 50,
-            recipient: 'Bank XYZ',
-        },
-    }
-    const res = mockRes()
-
-    await withdrawFromWallet(req, res)
-
-    // Wallet updated emit
-    expect(mockEmit).toHaveBeenCalledWith('walletUpdated', wallet)
-    
-    // Fast-forward setTimeout
-    jest.runAllTimers()
-
-    expect(transaction.save).toHaveBeenCalled()
-    expect(mockEmit).toHaveBeenCalledWith('transactionCreated', transaction)
-})
-
-
-    it('should fail if wallet is inactive', async () => {
-        Wallet.findOne.mockResolvedValue({
-            ...mockWallet,
-            status: 'Frozen',
-        })
-
-        const req = {
-            user: { _id: 'user123' },
-            body: { walletId: 'wallet123', amount: 10 },
-        }
-        const res = mockRes()
-
-        await withdrawFromWallet(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(403)
+    it('returns 400 for invalid amount', async () => {
+      req.body.amount = -10
+      await walletController.fundWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(400)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Invalid amount' })
     })
 
-    it('should fail if insufficient balance', async () => {
-        Wallet.findOne.mockResolvedValue({
-            ...mockWallet,
-            balance: 10,
-        })
-
-        const req = {
-            user: { _id: 'user123' },
-            body: { walletId: 'wallet123', amount: 100 },
-        }
-        const res = mockRes()
-
-        await withdrawFromWallet(req, res)
-
-        expect(res.status).toHaveBeenCalledWith(400)
+    it('returns 404 if wallet not found', async () => {
+      Wallet.findOne.mockResolvedValue(null)
+      await walletController.fundWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(404)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Wallet not found' })
     })
+
+    it('returns 403 if wallet not active', async () => {
+      Wallet.findOne.mockResolvedValue({ ...mockWallet, status: 'Inactive' })
+      await walletController.fundWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(403)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Wallet is not active' })
+    })
+
+    it('funds wallet successfully and completes transaction', async () => {
+      await walletController.fundWallet(req, res)
+
+      expect(mockWallet.balance).toBe(150)
+      expect(mockWallet.save).toHaveBeenCalled()
+      expect(mockTransaction.status).toBe(TRX_STATUS.COMPLETED)
+      expect(mockTransaction.save).toHaveBeenCalled()
+      expect(emit).toHaveBeenCalledWith(userId, 'transactionCreated', mockTransaction)
+      expect(emit).toHaveBeenCalledWith(userId, 'walletUpdated', mockWallet)
+      expect(emit).toHaveBeenCalledWith(userId, 'transactionUpdated', mockTransaction)
+      expect(res.status).toHaveBeenCalledWith(201)
+      expect(res.json).toHaveBeenCalledWith({ wallet: mockWallet, transaction: mockTransaction })
+    })
+  })
+
+  // ---------------- WITHDRAW WALLET ----------------
+  describe('withdrawFromWallet', () => {
+    beforeEach(() => {
+      req.body = { walletId: mockWallet._id, amount: 60, recipient: 'John' }
+      Wallet.findOne.mockResolvedValue(mockWallet)
+      Transaction.create.mockResolvedValue(mockTransaction)
+    })
+
+    it('returns 401 if user not authenticated', async () => {
+      req.user = null
+      await walletController.withdrawFromWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(401)
+    })
+
+    it('returns 400 for invalid amount', async () => {
+      req.body.amount = -5
+      await walletController.withdrawFromWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(400)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Invalid amount' })
+    })
+
+    it('returns 404 if wallet not found', async () => {
+      Wallet.findOne.mockResolvedValue(null)
+      await walletController.withdrawFromWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(404)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Wallet not found' })
+    })
+
+    it('returns 403 if wallet not active', async () => {
+      Wallet.findOne.mockResolvedValue({ ...mockWallet, status: 'Inactive' })
+      await walletController.withdrawFromWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(403)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Wallet is not active' })
+    })
+
+    it('returns 400 if insufficient balance', async () => {
+      Wallet.findOne.mockResolvedValue({ ...mockWallet, balance: 30 })
+      await walletController.withdrawFromWallet(req, res)
+      expect(res.status).toHaveBeenCalledWith(400)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Insufficient balance' })
+    })
+
+    it('withdraws successfully', async () => {
+      await walletController.withdrawFromWallet(req, res)
+
+      expect(mockWallet.balance).toBe(40)
+      expect(mockWallet.save).toHaveBeenCalled()
+      expect(Transaction.create).toHaveBeenCalledWith(expect.objectContaining({
+        userId,
+        walletId: mockWallet._id,
+        type: TRX_TYPE.WITHDRAW,
+        amount: 60,
+        status: TRX_STATUS.COMPLETED,
+        beneficiary: 'John'
+      }))
+      expect(emit).toHaveBeenCalledWith(userId, 'walletUpdated', mockWallet)
+      expect(emit).toHaveBeenCalledWith(userId, 'transactionCreated', mockTransaction)
+      expect(res.status).toHaveBeenCalledWith(200)
+      expect(res.json).toHaveBeenCalledWith({ wallet: mockWallet, transaction: mockTransaction })
+    })
+  })
+
+  // ---------------- GET WALLETS ----------------
+  describe('getWallets', () => {
+    it('returns 401 if not authenticated', async () => {
+      req.user = null
+      await walletController.getWallets(req, res)
+      expect(res.status).toHaveBeenCalledWith(401)
+      expect(res.json).toHaveBeenCalledWith({ message: 'Unauthorized' })
+    })
+
+    it('returns wallets successfully', async () => {
+      Wallet.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([mockWallet]) })
+      await walletController.getWallets(req, res)
+      expect(res.json).toHaveBeenCalledWith({ wallets: [mockWallet] })
+    })
+  })
 })

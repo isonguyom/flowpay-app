@@ -9,17 +9,16 @@ let io = null
 export const initSocket = (server) => {
     if (io) return io // Prevent multiple initializations
 
+    const allowedOrigins = process.env.CORS_ORIGIN.split(',');
+
     io = new Server(server, {
         cors: {
-            origin: [
-                'http://localhost:5173',
-                'http://frontend:5173',
-                'https://flowpayapp.vercel.app'
-            ],
+            origin: allowedOrigins, // no extra brackets
             methods: ['GET', 'POST', 'PUT'],
         },
         transports: ['websocket', 'polling'], // fallback enabled
-    })
+    });
+
 
 
     io.on('connection', (socket) => {

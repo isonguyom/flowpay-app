@@ -37,9 +37,8 @@ export const useTransactionStore = defineStore('transactions', () => {
             // Simulate network latency for skeletons
             if (import.meta.env.DEV) await simulateDelay(700)
 
-            const response = await api.get('/transactions', {
-                params: { page: page.value, limit: limit.value },
-            })
+        const response = await api.get('/transactions')
+
 
             const newTxs = response.data.transactions.map(tx => ({
                 ...tx,
@@ -60,6 +59,14 @@ export const useTransactionStore = defineStore('transactions', () => {
             loading.value = false
         }
     }
+
+    const updateTransaction = (tx) => {
+    const index = transactions.value.findIndex(t => t._id === tx._id)
+    if (index !== -1) {
+        transactions.value[index] = { ...tx, ref: tx._id.slice(0, 10) }
+    }
+}
+
 
     // ----------------------------
     // Add transaction from WebSocket
@@ -96,6 +103,7 @@ export const useTransactionStore = defineStore('transactions', () => {
         total,
         hasMore,
         fetchTransactions,
+        updateTransaction,
         addTransaction,
         prependTransaction,
         resetStore,

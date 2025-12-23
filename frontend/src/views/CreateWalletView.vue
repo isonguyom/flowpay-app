@@ -21,40 +21,33 @@ const { gotoRoute } = useUtils()
 const { fxList, loading: fxLoading } = storeToRefs(fxStore)
 
 // ------------------------
-// Form State
+// State
 // ------------------------
 const loading = ref(false)
 const showConfirmModal = ref(false)
 const toastRef = ref(null)
 
-const wallet = ref({
-    currency: '',
-    initialAmount: 0, // always 0
-})
+const currency = ref('')
 
-const touched = ref({
-    currency: false,
-})
-
-const errors = ref({
-    currency: null,
-})
+const touched = ref(false)
+const error = ref(null)
 
 // ------------------------
 // Validation
 // ------------------------
 const validate = () => {
-    errors.value.currency =
-        touched.value.currency && !wallet.value.currency ? 'Select a currency' : null
+    error.value = touched.value && !currency.value
+        ? 'Select a currency'
+        : null
 }
 
-const isFormValid = computed(() => !!wallet.value.currency)
+const isFormValid = computed(() => !!currency.value)
 
 // ------------------------
 // Handlers
 // ------------------------
 const confirmCreateWallet = () => {
-    touched.value.currency = true
+    touched.value = true
     validate()
 
     if (!isFormValid.value) {
@@ -70,26 +63,22 @@ const createWallet = async () => {
     loading.value = true
 
     try {
-        await walletStore.createWallet({
-            currency: wallet.value.currency,
-            amount: 0,
-        })
+        // ✅ ONLY send currency
+        await walletStore.createWallet(currency.value)
 
         toastRef.value?.addToast(
-            `Wallet for ${wallet.value.currency} created successfully!`,
+            `Wallet for ${currency.value} created successfully`,
             'success'
         )
 
-        // Wait a short time for user to see the toast, then redirect
         setTimeout(() => {
             gotoRoute('/dashboard')
         }, 1200)
-
-        // Reset form
-        wallet.value.currency = fxList.value[0]?.value || ''
-        touched.value.currency = false
     } catch (err) {
-        toastRef.value?.addToast(walletStore.error || 'Failed to create wallet', 'error')
+        toastRef.value?.addToast(
+            walletStore.error || 'Failed to create wallet',
+            'error'
+        )
     } finally {
         loading.value = false
     }
@@ -100,7 +89,7 @@ const createWallet = async () => {
 // ------------------------
 onMounted(async () => {
     await fxStore.fetchFx()
-    wallet.value.currency = fxList.value[0]?.value || ''
+    currency.value = fxList.value?.[0]?.value || ''
 })
 </script>
 
@@ -110,11 +99,11 @@ onMounted(async () => {
             <PageHeader title="Create Wallet" subtitle="Add a new currency wallet to your account" />
 
             <form @submit.prevent="confirmCreateWallet" class="space-y-6">
-                <BaseSelect label="Currency" v-model="wallet.currency" :options="fxList" :loading="fxLoading"
-                    :error="errors.currency" @change="touched.currency = true" />
+                <BaseSelect label="Currency" v-model="currency" :options="fxList" :loading="fxLoading" :error="error"
+                    @change="touched = true" />
 
-                <BaseInput label="Initial Amount" type="number" placeholder="0.00" v-model="wallet.initialAmount"
-                    readonly disabled />
+                <!-- Display-only -->
+                <BaseInput label="Initial Balance" type="number" value="0.00" readonly disabled />
 
                 <BaseButton type="submit" fullWidth :disabled="!isFormValid || loading" :loading="loading">
                     Create Wallet
@@ -124,9 +113,8 @@ onMounted(async () => {
             <ConfirmModal :show="showConfirmModal" title="Confirm Wallet Creation" :loading="loading"
                 @close="showConfirmModal = false" @confirm="createWallet">
                 <p>
-                    You are about to create a wallet with
-                    <strong>{{ wallet.currency }}</strong> currency
-                    and an initial balance of
+                    You are about to create a
+                    <strong>{{ currency }}</strong> wallet with an initial balance of
                     <strong>0</strong>.
                 </p>
             </ConfirmModal>
