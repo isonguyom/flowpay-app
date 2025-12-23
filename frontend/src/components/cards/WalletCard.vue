@@ -5,7 +5,6 @@ import BaseButton from '@/components/utilities/BaseButton.vue'
 
 import { useFxStore } from '@/stores/fx'
 import { useUtils } from '@/composables/useUtils'
-import { useHelpers } from '@/composables/useHelpers'
 import { useFx } from '@/composables/useFx'
 
 // Props
@@ -25,7 +24,6 @@ const { fxList, feeRate, loading: fxLoading } = storeToRefs(fxStore)
 
 // Composables
 const { formatCurrencyCompact } = useUtils()
-const { getCurrencyColor } = useHelpers()
 
 const { convert } = useFx({
     feeRate,
@@ -57,7 +55,7 @@ const handleWithdraw = () => emit('withdraw', props.wallet)
 
             <!-- Currency Badge -->
             <span class="text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-                :class="getCurrencyColor(wallet.currency)">
+                :style="`background-color: ${wallet?.color || '#6B7280'}`">
                 {{ wallet.currency }}
             </span>
         </div>

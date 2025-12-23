@@ -26,7 +26,6 @@ export default {
         'controllers/**/*.js',
         'services/**/*.js',
         'middlewares/**/*.js',
-        'routes/**/*.js',
         '!**/node_modules/**',
         '!**/tests/**',
     ],

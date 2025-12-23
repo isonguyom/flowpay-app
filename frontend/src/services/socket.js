@@ -7,65 +7,69 @@ const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 let socket = null
 
-export const initSocket = () => {
+export function initSocket() {
+  if (socket) return socket // singleton guard
+
   const authStore = useAuthStore()
   const transactionStore = useTransactionStore()
   const walletStore = useWalletStore()
 
-  if (socket) return socket // prevent multiple initializations
-
   socket = io(SOCKET_URL, {
     transports: ['websocket', 'polling'],
     withCredentials: true,
+    autoConnect: true,
   })
 
   socket.on('connect', () => {
-    console.log('Connected to WebSocket server:', socket.id)
+    console.log('[socket] connected:', socket.id)
 
-    // Join user room only if user is authenticated
-    if (authStore.isAuthenticated()) {
+    if (authStore.isAuthenticated?.()) {
       const userId = authStore.user?._id
       if (userId) {
         socket.emit('joinRoom', userId)
-        console.log(`Joined room for user: ${userId}`)
       }
     }
   })
 
   socket.on('disconnect', () => {
-    console.log('Disconnected from WebSocket server')
+    console.log('[socket] disconnected')
   })
 
-  // -------------------------------
+  // --------------------
   // Transaction events
-  // -------------------------------
+  // --------------------
   socket.on('transactionCreated', (transaction) => {
-    console.log('Transaction created received:', transaction)
     transactionStore.addTransaction(transaction)
   })
 
   socket.on('transactionUpdated', (transaction) => {
-    console.log('Transaction updated received:', transaction)
     transactionStore.updateTransaction(transaction)
   })
 
-  // -------------------------------
+  // --------------------
   // Wallet events
-  // -------------------------------
-  socket.on('walletUpdated', (wallet) => {
-    console.log('Wallet update received:', wallet)
-    walletStore.updateWallet(wallet)
+  // --------------------
+  socket.on('walletCreated', (wallet) => {
+    walletStore.addWallet(wallet)
   })
 
-  socket.on('walletCreated', (wallet) => {
-    console.log('New wallet created:', wallet)
-    walletStore.addWallet(wallet)
+  socket.on('walletUpdated', (wallet) => {
+    walletStore.updateWallet(wallet)
   })
 
   return socket
 }
 
-export const getSocket = () => {
-  if (!socket) throw new Error('Socket not initialized. Call initSocket() first.')
+export function getSocket() {
+  if (!socket) {
+    throw new Error('Socket not initialized. Call initSocket() first.')
+  }
   return socket
+}
+
+export function disconnectSocket() {
+  if (socket) {
+    socket.disconnect()
+    socket = null
+  }
 }

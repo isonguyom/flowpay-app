@@ -1,12 +1,4 @@
-import { useCurrencyStore } from "@/stores/currency"
-
 export function useHelpers() {
-
-    const { currencyColorMap } = useCurrencyStore()
-
-    const getCurrencyColor = (currency) => {
-        return currencyColorMap[currency] || 'bg-gray-400' // default color if not mapped
-    }
 
     /* ----------------------------------
      * Payment / Transaction Status
@@ -58,7 +50,6 @@ export function useHelpers() {
         new Promise((resolve) => setTimeout(resolve, ms))
 
     return {
-        getCurrencyColor,
         getStatusClass,
         getStatusLabel,
         getWalletStatusClass,
