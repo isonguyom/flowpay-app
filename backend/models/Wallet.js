@@ -1,4 +1,3 @@
-// models/Wallet.js
 import mongoose from 'mongoose'
 import { setPrimaryWallet, WALLET_STATUS } from '../helpers/walletHelpers.js'
 import { isCurrencyAllowed } from '../config/currenciesConfig.js'

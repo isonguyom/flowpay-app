@@ -55,26 +55,38 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+
+  // Ensure user info is loaded if token exists
+  if (authStore.token && !authStore.user) {
+    try {
+      await authStore.fetchMe()
+    } catch {
+      authStore.logout()
+      return next('/login')
+    }
+  }
+
   const isAuthenticated = authStore.isAuthenticated()
 
-  // Home route logic
+  // Home route
   if (to.path === '/') {
     return isAuthenticated ? next('/dashboard') : next('/login')
   }
 
-  // Routes that require auth
+  // Auth-protected routes
   if (to.meta.requiresAuth && !isAuthenticated) {
-    return next('/login')
+    return next({ path: '/login', query: { redirect: to.fullPath } })
   }
 
-  // Guest-only routes (login/register)
+  // Guest-only routes
   if (to.meta.guestOnly && isAuthenticated) {
     return next('/dashboard')
   }
 
   next()
 })
+
 
 export default router

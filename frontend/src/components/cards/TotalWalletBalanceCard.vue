@@ -53,16 +53,17 @@ onMounted(async () => {
 <template>
     <section class="mb-6">
         <div
-            class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex flex-col md:flex-row items-start justify-between gap-8">
+            class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-md flex flex-wrap items-start justify-between gap-y-2 gap-x-8">
 
             <div class="space-y-2">
                 <!-- Balance Display -->
                 <div class="space-y-1">
-                    <h3 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-3">Total Wallet Balance</h3>
+                    <h3 class="text-sm sm:text-base lg:text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Total
+                        Wallet Balance</h3>
                     <div
-                        class="text-2xl md:text-4xl not-[]:flex items-center gap-x-2 font-semibold text-gray-800 dark:text-gray-100 relative w-fit">
+                        class="text-xl sm:text-2xl md:text-4xl not-[]:flex items-center gap-x-2 font-semibold text-gray-800 dark:text-gray-100 relative w-fit">
                         <span v-if="isVisible">{{ formatCurrencyCompact(totalBalance, defaultCurrency) || '0.00'
-                            }}</span>
+                        }}</span>
                         <span v-else>•••••</span>
 
                         <button type="button" @click="toggleVisibility" class="absolute inset-y-0 -right-5 flex items-center text-gray-500 dark:text-gray-400 text-sm
@@ -73,7 +74,7 @@ onMounted(async () => {
                         </button>
                     </div>
 
-                    <p class="text-sm md:text-base text-gray-500 dark:text-gray-400">
+                    <p class="text-xs md:text-sm lg:text-base text-gray-500 dark:text-gray-400">
                         ≈ $<span v-if="isVisible">{{ convertedUSD }}</span>
                         <span v-else>•••••</span>
                     </p>

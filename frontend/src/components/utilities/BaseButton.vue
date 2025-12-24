@@ -38,25 +38,25 @@ const variantClasses = computed(() => {
         case 'outline':
             return `
         border border-brand text-brand
-        hover:bg-brand/5
+        enabled:hover:bg-brand/5
         focus-visible:ring-brand
       `
         case 'ghost':
             return `
         text-brand
-        hover:text-brand/80
+        enabled:hover:text-brand/80
         focus-visible:ring-gray-400
       `
         case 'soft':
             return `
         bg-brand/10 text-brand
-        hover:bg-brand/15
+        enabled:hover:bg-brand/15
         focus-visible:ring-brand
       `
         default: // solid
             return `
         bg-brand text-white
-        hover:bg-brand/90
+        enabled:hover:bg-brand/90
         focus-visible:ring-brand
       `
     }

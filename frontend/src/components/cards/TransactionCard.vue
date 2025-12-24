@@ -54,14 +54,14 @@ const meta = computed(() => {
 </script>
 
 <template>
-    <div class="p-4 flex justify-between gap-4 transition-all hover:opacity-80">
+    <div
+        class="p-2 sm:p-4 flex justify-between gap-4 transition-all hover:bg-gray-50/50 dark:hover:bg-gray-950/20 rounded-md">
         <!-- Left -->
         <div class="min-w-0 flex-1">
-            <p
-                class="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 flex flex-col md:flex-row gap-x-1">
+            <p class="text-xs md:text-sm font-medium text-gray-800 dark:text-gray-200 flex flex-wrap gap-x-1">
                 <span class="uppercase">{{ meta.title }}</span>
                 <span class="text-gray-500 font-normal">
-                    <span class="hidden md:inline text-xs md:text-sm">•</span>
+                    <span class="hidden md:inline text-xs">•</span>
                     {{ meta.subtitle }}
                 </span>
             </p>
@@ -72,10 +72,10 @@ const meta = computed(() => {
 
         <!-- Right -->
         <div class="text-right shrink-0">
-            <p class="text-sm md:text-base font-semibold text-gray-900 dark:text-gray-100">
+            <p class="text-xs md:text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {{ meta.amount }}
             </p>
-            <p class="text-xs md:text-sm" :class="getStatusClass(meta.status)">
+            <p class="text-xs md:text-sm font-medium" :class="getStatusClass(meta.status)">
                 {{ meta.status }}
             </p>
         </div>

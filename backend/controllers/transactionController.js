@@ -1,14 +1,12 @@
 import Transaction from '../models/Transaction.js'
 import { getSocket } from '../services/socket.js'
-import {
-    buildTransactionQuery
-} from '../helpers/transactionControllerHelpers.js'
-
+import { buildTransactionQuery } from '../helpers/transactionControllerHelpers.js'
 
 // ==================================== GET API CONTROLLER =================================
 /**
  * GET /api/transactions
  * Fetch transactions for authenticated user
+ * Supports pagination: ?page=1&limit=20
  */
 export const getUserTransactions = async (req, res) => {
     const userId = req.user?._id
@@ -23,23 +21,38 @@ export const getUserTransactions = async (req, res) => {
             type: req.query.type,
             status: req.query.status,
             startDate: req.query.startDate,
-            endDate: req.query.endDate
+            endDate: req.query.endDate,
         })
 
-        const transactions = await Transaction
-            .find(query)
+        // Pagination
+        const page = Math.max(parseInt(req.query.page) || 1, 1)
+        const limit = Math.max(parseInt(req.query.limit) || 20, 1)
+        const skip = (page - 1) * limit
+
+        // Total count
+        const total = await Transaction.countDocuments(query)
+
+        // Fetch paginated transactions
+        const transactions = await Transaction.find(query)
             .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean()
 
-        return res.json({ transactions })
-
+        return res.json({
+            transactions,
+            total,
+            page,
+            limit,
+        })
     } catch (err) {
         console.error('[TransactionController] getUserTransactions failed', {
             userId: userId.toString(),
-            error: err.message
+            error: err.message,
         })
 
         return res.status(500).json({
-            message: 'Failed to fetch transactions'
+            message: 'Failed to fetch transactions',
         })
     }
 }
@@ -62,14 +75,11 @@ export const emitTransactionUpdate = (transaction) => {
         const io = getSocket()
         if (!io) return
 
-        io
-            .to(transaction.userId.toString())
-            .emit('transactionCreated', transaction)
-
+        io.to(transaction.userId.toString()).emit('transactionCreated', transaction)
     } catch (err) {
         console.error('[Socket] Failed to emit transaction update', {
             transactionId: transaction?._id,
-            error: err.message
+            error: err.message,
         })
     }
 }

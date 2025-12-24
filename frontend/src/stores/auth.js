@@ -160,6 +160,12 @@ export const useAuthStore = defineStore('auth', () => {
     // ------------------------
     const isAuthenticated = () => !!user.value && !!token.value
 
+    // Reset store reactive data
+    const resetStore = () => {
+        error.value = null
+        loading.value = false
+    }
+
     return {
         user,
         token,
@@ -172,5 +178,6 @@ export const useAuthStore = defineStore('auth', () => {
         updateProfile,
         logout,
         isAuthenticated,
+        resetStore,
     }
 })

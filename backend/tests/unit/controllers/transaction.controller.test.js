@@ -1,4 +1,3 @@
-// npm run test -- tests/unit/controllers/transaction.controller.test.js  
 import { getUserTransactions, emitTransactionUpdate } from '../../../controllers/transactionController.js'
 import Transaction from '../../../models/Transaction.js'
 import { getSocket } from '../../../services/socket.js'
@@ -33,17 +32,42 @@ describe('Transaction Controller', () => {
         expect(mockRes.json).toHaveBeenCalledWith({ message: 'Unauthorized' })
     })
 
-    it('should fetch transactions for a user', async () => {
-        const mockData = [{ _id: 'trx1', userId: mockUserId }]
-        Transaction.find.mockReturnValue({
-            sort: jest.fn().mockResolvedValue(mockData)
-        })
+    it('should fetch transactions for a user with pagination', async () => {
+        const mockTransactions = [{ _id: 'trx1', userId: mockUserId }]
+        const mockTotal = 50
+
+        // Mock total count
+        Transaction.countDocuments.mockResolvedValue(mockTotal)
+
+        // Mock find chain correctly
+        const mockFindChain = {
+            sort: jest.fn().mockReturnThis(),
+            skip: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockReturnThis(),
+            lean: jest.fn().mockResolvedValue(mockTransactions) // must resolve
+        }
+        Transaction.find.mockReturnValue(mockFindChain)
+
+        // Set query params
+        mockReq.query.page = '2'
+        mockReq.query.limit = '10'
 
         await getUserTransactions(mockReq, mockRes)
 
+        expect(Transaction.countDocuments).toHaveBeenCalledWith({ userId: mockUserId })
         expect(Transaction.find).toHaveBeenCalledWith({ userId: mockUserId })
-        expect(mockRes.json).toHaveBeenCalledWith({ transactions: mockData })
+        expect(mockFindChain.sort).toHaveBeenCalledWith({ createdAt: -1 })
+        expect(mockFindChain.skip).toHaveBeenCalledWith(10)
+        expect(mockFindChain.limit).toHaveBeenCalledWith(10)
+
+        expect(mockRes.json).toHaveBeenCalledWith({
+            transactions: mockTransactions,
+            total: mockTotal,
+            page: 2,
+            limit: 10
+        })
     })
+
 
     it('should handle errors and return 500', async () => {
         Transaction.find.mockImplementation(() => { throw new Error('DB failure') })

@@ -15,7 +15,7 @@ export const useTransactionStore = defineStore('transactions', () => {
 
     // Pagination
     const page = ref(1)
-    const limit = ref(20)
+    const limit = ref(8)
     const total = ref(0)
     const hasMore = computed(() => transactions.value.length < total.value)
 
@@ -38,18 +38,22 @@ export const useTransactionStore = defineStore('transactions', () => {
         }
 
         try {
-            // Simulate network latency for skeletons in dev mode
             if (import.meta.env.DEV) await simulateDelay(700)
 
-            const response = await api.get('/transactions')
-            const data = response.data
+            // Include pagination parameters in API call
+            const response = await api.get('/transactions', {
+                params: {
+                    limit: limit.value,
+                    page: page.value,
+                },
+            })
 
+            const data = response.data
             const newTxs = (data.transactions || []).map(tx => ({
                 ...tx,
                 ref: tx._id?.slice(0, 10) || tx.id?.slice(0, 10),
             }))
 
-            // Append new transactions avoiding duplicates
             const existingIds = new Set(transactions.value.map(tx => tx._id || tx.id))
             const filteredTxs = newTxs.filter(tx => !existingIds.has(tx._id || tx.id))
 
@@ -63,6 +67,7 @@ export const useTransactionStore = defineStore('transactions', () => {
             loading.value = false
         }
     }
+
 
     /**
      * Add or prepend a transaction (optimistic update)

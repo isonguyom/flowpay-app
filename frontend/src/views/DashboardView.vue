@@ -197,13 +197,17 @@ onMounted(async () => {
             <section>
                 <div class="flex justify-between mb-3">
                     <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Transactions</h3>
-                    <BaseButton v-if="transactionsListRef?.transactions.length > 0" variant="ghost" size="sm"
-                        @click="gotoRoute('/transactions')">
+
+                    <!-- Show "View all" only if total > maxItems -->
+                    <BaseButton v-if="transactionsListRef?.transactions.length && transactionsListRef?.total > 5"
+                        variant="ghost" size="sm" @click="gotoRoute('/transactions')">
                         View all
                     </BaseButton>
                 </div>
-                <TransactionsList ref="transactionsListRef" />
+
+                <TransactionsList ref="transactionsListRef" :max-items="7" />
             </section>
+
 
             <!-- Fund Modal -->
             <ConfirmModal :show="showFundModal" title="Fund Wallet" :loading="submitting" @close="showFundModal = false"

@@ -1,37 +1,44 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
+
 import BaseInput from '@/components/utilities/BaseInput.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
+
 import { useAuthStore } from '@/stores/auth'
-import { useWalletStore } from '@/stores/wallets'
 import { useUtils } from '@/composables/useUtils'
 
 const authStore = useAuthStore()
-const walletStore = useWalletStore()
 const { gotoRoute } = useUtils()
 
-let nameTimeout, emailTimeout, passwordTimeout
+/* --------------------
+ * State
+ * -------------------- */
 const loading = ref(false)
 const form = ref({
     name: '',
     email: '',
     password: ''
 })
-
 const errors = ref({
     name: null,
     email: null,
     password: null
 })
-
 const hints = ref({
     name: '',
     email: '',
     password: 'Password must be at least 8 characters'
 })
 
-// --- Validation functions ---
+/* --------------------
+ * Debounce timers
+ * -------------------- */
+let nameTimeout, emailTimeout, passwordTimeout
+
+/* --------------------
+ * Validation functions
+ * -------------------- */
 const validateName = (value) => {
     if (!value) errors.value.name = 'Name is required'
     else errors.value.name = null
@@ -49,7 +56,9 @@ const validatePassword = (value) => {
     else errors.value.password = null
 }
 
-// --- Debounced watchers ---
+/* --------------------
+ * Debounced watchers
+ * -------------------- */
 watch(() => form.value.name, (newVal) => {
     clearTimeout(nameTimeout)
     nameTimeout = setTimeout(() => validateName(newVal), 300)
@@ -65,23 +74,40 @@ watch(() => form.value.password, (newVal) => {
     passwordTimeout = setTimeout(() => validatePassword(newVal), 300)
 })
 
-// --- Register handler ---
-const register = async () => {
+/* --------------------
+ * Cleanup on unmount
+ * -------------------- */
+onBeforeUnmount(() => {
+    clearTimeout(nameTimeout)
+    clearTimeout(emailTimeout)
+    clearTimeout(passwordTimeout)
+})
+
+/* --------------------
+ * Form validation
+ * -------------------- */
+const isFormValid = () => {
     validateName(form.value.name)
     validateEmail(form.value.email)
     validatePassword(form.value.password)
+    return !errors.value.name && !errors.value.email && !errors.value.password
+}
 
-    if (errors.value.name || errors.value.email || errors.value.password) return
+/* --------------------
+ * Register handler
+ * -------------------- */
+const register = async () => {
+    if (!isFormValid()) return
+    if (loading.value || authStore.loading) return
 
     loading.value = true
     try {
-        // Register the user
-        const success = await authStore.register(form.value.name, form.value.email, form.value.password)
-
-        if (success) {
-            // Redirect to dashboard
-            gotoRoute('/dashboard')
-        }
+        const success = await authStore.register(
+            form.value.name,
+            form.value.email,
+            form.value.password
+        )
+        if (success) gotoRoute('/dashboard')
     } catch (err) {
         console.error('Register component error:', err)
     } finally {
@@ -92,25 +118,26 @@ const register = async () => {
 
 <template>
     <AuthLayout>
-        <form @submit.prevent="register" class="space-y-4">
-
+        <form @submit.prevent="register" class="space-y-4" novalidate aria-live="polite">
             <BaseInput id="register-name" label="Full Name" type="text" placeholder="John Doe" v-model="form.name"
-                :error="errors.name" :hint="hints.name" />
+                :error="errors.name" :hint="hints.name" :aria-invalid="!!errors.name" />
 
             <BaseInput id="register-email" label="Email address" type="email" placeholder="you@example.com"
-                v-model="form.email" :error="errors.email" :hint="hints.email" />
+                v-model="form.email" :error="errors.email" :hint="hints.email" :aria-invalid="!!errors.email" />
 
             <BaseInput id="register-password" label="Password" type="password" placeholder="••••••••"
-                v-model="form.password" :error="errors.password" :hint="hints.password" />
+                v-model="form.password" :error="errors.password" :hint="hints.password"
+                :aria-invalid="!!errors.password" />
 
-            <BaseButton fullWidth type="submit" :loading="loading">
-                <span>Register</span>
-            </BaseButton>
+            <div>
+                <BaseButton type="submit" fullWidth :loading="loading || authStore.loading">
+                    Register
+                </BaseButton>
 
-            <p v-if="authStore.error" class="text-sm text-red-600 text-center">
-                {{ authStore.error }}
-            </p>
-
+                <p v-if="authStore.error" class="text-xs sm:text-sm text-red-600 text-center mt-2" role="alert">
+                    {{ authStore.error }}
+                </p>
+            </div>
         </form>
     </AuthLayout>
 </template>

@@ -78,8 +78,8 @@ const describedBy = computed(() => {
 
             <!-- Eye Toggle -->
             <button v-if="type === 'password'" type="button" :disabled="disabled" @click="showPassword = !showPassword"
-                class="absolute inset-y-0 right-3 flex items-center
-               text-gray-500 dark:text-gray-400
+                class="absolute top-1/2 right-3 -translate-1/2 flex items-center justify-center h-fit rounded
+               text-gray-500 dark:text-gray-400 
                hover:text-gray-700 dark:hover:text-gray-200
                focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer
                disabled:opacity-50 disabled:cursor-not-allowed"

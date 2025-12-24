@@ -15,9 +15,6 @@ import { useFxStore } from '@/stores/fx'
 import { useValidators } from '@/composables/useValidators'
 import { useUtils } from '@/composables/useUtils'
 
-// ------------------------
-// Stores & utils
-// ------------------------
 const authStore = useAuthStore()
 const fxStore = useFxStore()
 
@@ -25,14 +22,11 @@ const { fxList, loading: fxLoading } = storeToRefs(fxStore)
 const { gotoRoute } = useUtils()
 const { validateRequired, validateEmail } = useValidators()
 
-// ------------------------
-// UI
-// ------------------------
 const toastRef = ref(null)
 
-// ------------------------
-// Form State
-// ------------------------
+const savingSettings = ref(false)
+const loggingOut = ref(false)
+
 const settings = ref({
     userName: '',
     userEmail: '',
@@ -45,14 +39,10 @@ const errors = ref({
     defaultCurrency: null,
 })
 
-// ------------------------
-// Sync store → form
-// ------------------------
 watch(
     () => authStore.user,
     (user) => {
         if (!user) return
-
         settings.value = {
             userName: user.name || '',
             userEmail: user.email || '',
@@ -62,31 +52,26 @@ watch(
     { immediate: true }
 )
 
-// ------------------------
-// Validation
-// ------------------------
 const validateForm = () => {
-    errors.value.userName =
-        validateRequired(settings.value.userName, 'Name is required')
-
+    errors.value.userName = validateRequired(settings.value.userName, 'Name is required')
     errors.value.userEmail =
         validateRequired(settings.value.userEmail, 'Email is required') ||
         validateEmail(settings.value.userEmail, 'Invalid email address')
-
-    errors.value.defaultCurrency =
-        validateRequired(settings.value.defaultCurrency, 'Please select a currency')
+    errors.value.defaultCurrency = validateRequired(
+        settings.value.defaultCurrency,
+        'Please select a currency'
+    )
 
     return !Object.values(errors.value).some(Boolean)
 }
 
-// ------------------------
-// Actions
-// ------------------------
 const saveSettings = async () => {
-    if (!validateForm()) {
+    if (savingSettings.value || !validateForm()) {
         toastRef.value?.addToast('Please fix the form errors', 'error')
         return
     }
+
+    savingSettings.value = true
 
     try {
         await authStore.updateProfile({
@@ -95,37 +80,37 @@ const saveSettings = async () => {
             defaultCurrency: settings.value.defaultCurrency,
         })
 
-        toastRef.value?.addToast(
-            'Settings updated successfully',
-            'success'
-        )
+        toastRef.value?.addToast('Settings updated successfully', 'success')
     } catch (err) {
         toastRef.value?.addToast(
             err?.response?.data?.message || 'Failed to update settings',
             'error'
         )
+    } finally {
+        savingSettings.value = false
     }
 }
 
 const logout = async () => {
-    try {
-        // Ensure stores fully reset first
-        // authStore.clearProfile()
-        await authStore.logout()
+    if (loggingOut.value) return
 
-        // Redirect only AFTER logout is complete
+    loggingOut.value = true
+
+    try {
+        await authStore.logout()
         gotoRoute('/login')
     } catch {
         toastRef.value?.addToast('Logout failed', 'error')
+    } finally {
+        loggingOut.value = false
     }
 }
 
-// ------------------------
-// Lifecycle
-// ------------------------
 onMounted(async () => {
     try {
-        await fxStore.fetchFx()
+        if (!fxList.value.length) {
+            await fxStore.fetchFx()
+        }
 
         if (authStore.isAuthenticated() && !authStore.user) {
             await authStore.fetchMe()
@@ -139,26 +124,21 @@ onMounted(async () => {
 <template>
     <AppLayout>
         <div class="w-full max-w-2xl mx-auto py-6 space-y-8">
-            <!-- Header -->
             <PageHeader title="Settings" subtitle="Manage your account preferences" />
 
-            {{authStore.user.id}}
-
-            <!-- Account Settings -->
-            <form @submit.prevent="saveSettings" class="space-y-6">
+            <form class="space-y-6" @submit.prevent="saveSettings">
                 <BaseInput label="Name" v-model="settings.userName" :error="errors.userName" />
 
-                <BaseInput label="Email" v-model="settings.userEmail" :error="errors.userEmail" />
+                <BaseInput label="Email" v-model="settings.userEmail" disabled readonly :error="errors.userEmail" />
 
                 <BaseSelect label="Default Currency" v-model="settings.defaultCurrency" :options="fxList"
                     :loading="fxLoading" :error="errors.defaultCurrency" />
 
-                <BaseButton type="submit" fullWidth :loading="authStore.loading">
+                <BaseButton type="submit" fullWidth :loading="savingSettings" :disabled="loggingOut">
                     Save Settings
                 </BaseButton>
             </form>
 
-            <!-- Appearance -->
             <div class="flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Appearance Mode
@@ -166,14 +146,13 @@ onMounted(async () => {
                 <DarkModeToggle />
             </div>
 
-            <!-- Logout -->
             <div class="pt-4 border-t border-gray-200 dark:border-gray-800">
-                <BaseButton variant="outline" fullWidth :loading="authStore.loading" @click="logout">
+                <BaseButton variant="outline" fullWidth :loading="loggingOut" :disabled="savingSettings"
+                    @click="logout">
                     Logout
                 </BaseButton>
             </div>
 
-            <!-- Toast -->
             <BaseToast ref="toastRef" />
         </div>
     </AppLayout>

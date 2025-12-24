@@ -14,6 +14,9 @@ import { useWalletStore } from '@/stores/wallets'
 import { useFxStore } from '@/stores/fx'
 import { useUtils } from '@/composables/useUtils'
 
+// ------------------------
+// Stores & utils
+// ------------------------
 const walletStore = useWalletStore()
 const fxStore = useFxStore()
 const { gotoRoute } = useUtils()
@@ -23,23 +26,18 @@ const { fxList, loading: fxLoading } = storeToRefs(fxStore)
 // ------------------------
 // State
 // ------------------------
+const currency = ref('')
 const loading = ref(false)
 const showConfirmModal = ref(false)
 const toastRef = ref(null)
-
-const currency = ref('')
-
 const touched = ref(false)
-const error = ref(null)
 
 // ------------------------
 // Validation
 // ------------------------
-const validate = () => {
-    error.value = touched.value && !currency.value
-        ? 'Select a currency'
-        : null
-}
+const error = computed(() =>
+    touched.value && !currency.value ? 'Select a currency' : null
+)
 
 const isFormValid = computed(() => !!currency.value)
 
@@ -48,7 +46,6 @@ const isFormValid = computed(() => !!currency.value)
 // ------------------------
 const confirmCreateWallet = () => {
     touched.value = true
-    validate()
 
     if (!isFormValid.value) {
         toastRef.value?.addToast('Please select a currency', 'error')
@@ -63,7 +60,6 @@ const createWallet = async () => {
     loading.value = true
 
     try {
-        // ✅ ONLY send currency
         await walletStore.createWallet(currency.value)
 
         toastRef.value?.addToast(
@@ -71,10 +67,8 @@ const createWallet = async () => {
             'success'
         )
 
-        setTimeout(() => {
-            gotoRoute('/dashboard')
-        }, 1200)
-    } catch (err) {
+        setTimeout(() => gotoRoute('/dashboard'), 1200)
+    } catch {
         toastRef.value?.addToast(
             walletStore.error || 'Failed to create wallet',
             'error'
@@ -93,6 +87,7 @@ onMounted(async () => {
 })
 </script>
 
+
 <template>
     <AppLayout>
         <div class="w-full max-w-2xl mx-auto py-6 space-y-8">
@@ -103,7 +98,7 @@ onMounted(async () => {
                     @change="touched = true" />
 
                 <!-- Display-only -->
-                <BaseInput label="Initial Balance" type="number" value="0.00" readonly disabled />
+                <BaseInput label="Initial Balance" type="number" value="0.00" placeholder="0.00" readonly disabled />
 
                 <BaseButton type="submit" fullWidth :disabled="!isFormValid || loading" :loading="loading">
                     Create Wallet
