@@ -55,7 +55,7 @@ const handleWithdraw = () => emit('withdraw', props.wallet)
                     {{ wallet.currency }} Wallet
                 </span>
                 <div
-                    class=" mt-2 flex items-center gap-x-2 font-semibold text-lg md:text-xl text-gray-800 dark:text-gray-100 relative w-fit">
+                    class=" mt-1 flex items-center gap-x-2 font-semibold text-lg md:text-xl text-gray-800 dark:text-gray-100 relative w-fit">
                     <span v-if="isVisible">{{ formatCurrencyCompact(wallet.balance, wallet.currency) }}</span>
                     <span v-else>•••••</span>
 

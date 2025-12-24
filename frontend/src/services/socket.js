@@ -21,7 +21,7 @@ export function initSocket() {
   })
 
   socket.on('connect', () => {
-    console.log('[socket] connected:', socket.id)
+    // console.log('[socket] connected:', socket.id)
 
     if (authStore.isAuthenticated?.()) {
       const userId = authStore.user?._id
@@ -32,7 +32,7 @@ export function initSocket() {
   })
 
   socket.on('disconnect', () => {
-    console.log('[socket] disconnected')
+    // console.log('[socket] disconnected')
   })
 
   // --------------------

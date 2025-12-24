@@ -88,7 +88,7 @@ onMounted(() => {
         </h2>
         <ApiSkeleton :loading="loading" :error="error" :items="fxList">
             <template #default="{ items }">
-                <div class="w-full h-100">
+                <div class="w-full h-60 md:h-80">
                     <Line :data="chartData" :options="chartOptions" class="w-full h-full" />
                 </div>
             </template>

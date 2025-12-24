@@ -63,7 +63,7 @@ onMounted(async () => {
                     <div
                         class="text-xl sm:text-2xl md:text-4xl not-[]:flex items-center gap-x-2 font-semibold text-gray-800 dark:text-gray-100 relative w-fit">
                         <span v-if="isVisible">{{ formatCurrencyCompact(totalBalance, defaultCurrency) || '0.00'
-                        }}</span>
+                            }}</span>
                         <span v-else>•••••</span>
 
                         <button type="button" @click="toggleVisibility" class="absolute inset-y-0 -right-5 flex items-center text-gray-500 dark:text-gray-400 text-sm
@@ -88,7 +88,7 @@ onMounted(async () => {
             <!-- Actions -->
             <div class="flex gap-3 flex-wrap">
                 <BaseButton @click="handleMakePayment" size="sm" variant="solid">
-                   <span class="text-xs md:text-sm">Make Payment</span>
+                    <span class="text-xs md:text-sm">Make Payment</span>
                 </BaseButton>
             </div>
         </div>

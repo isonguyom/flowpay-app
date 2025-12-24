@@ -117,7 +117,7 @@ const meetsSettlementMinimum = computed(() =>
 
 const sourceWalletOptions = computed(() =>
     wallets.value.map(w => ({
-        label: `${w.currency} (Balance: ${w.balance})`,
+        label: `${w.currency} (Balance: ${w.balance.toFixed(2)})`,
         value: w.currency
     }))
 )
@@ -278,8 +278,7 @@ onMounted(async () => {
                         @change="touched.destinationCurrency = true" />
                 </div>
 
-                <div v-if="fxRate && amountNumber"
-                    class="rounded-xl border bg-gray-50 dark:bg-gray-900 p-4 text-sm space-y-2">
+                <div v-if="fxRate && amountNumber" class="rounded-xl bg-gray-50 dark:bg-gray-900 p-4 text-sm space-y-2">
                     <div class="flex justify-between">
                         <span>Exchange rate</span>
                         <span>
