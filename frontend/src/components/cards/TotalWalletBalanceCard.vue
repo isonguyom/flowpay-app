@@ -43,7 +43,7 @@ const handleCreateWallet = () => emit('createWallet')
 const handleMakePayment = () => emit('makePayment')
 
 // Computed
-const convertedUSD = computed(() => convert(props.totalBalance, props.defaultCurrency, 'USD', false) || '0.00')
+const convertedUSD = computed(() => convert(props.totalBalance, props.defaultCurrency, 'USD', false).toFixed(2) || '0.00')
 
 onMounted(async () => {
     await fxStore.fetchFx()
@@ -55,10 +55,10 @@ onMounted(async () => {
         <div
             class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-md flex flex-wrap items-start justify-between gap-y-2 gap-x-8">
 
-            <div class="space-y-2">
+            <div class="space-y-1">
                 <!-- Balance Display -->
                 <div class="space-y-1">
-                    <h3 class="text-sm sm:text-base lg:text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Total
+                    <h3 class="text-sm sm:text-base lg:text-lg font-medium text-gray-500 dark:text-gray-400">Total
                         Wallet Balance</h3>
                     <div
                         class="text-xl sm:text-2xl md:text-4xl not-[]:flex items-center gap-x-2 font-semibold text-gray-800 dark:text-gray-100 relative w-fit">
@@ -81,14 +81,14 @@ onMounted(async () => {
                 </div>
 
                 <BaseButton @click="handleCreateWallet" size="sm" variant="ghost">
-                    Create Wallet
+                    <span class="text-xs md:text-sm">Create Wallet</span>
                 </BaseButton>
             </div>
 
             <!-- Actions -->
             <div class="flex gap-3 flex-wrap">
                 <BaseButton @click="handleMakePayment" size="sm" variant="solid">
-                    Make Payment
+                   <span class="text-xs md:text-sm">Make Payment</span>
                 </BaseButton>
             </div>
         </div>
