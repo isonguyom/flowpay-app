@@ -2,6 +2,7 @@ import Wallet from '../models/Wallet.js'
 import Transaction from '../models/Transaction.js'
 import { TRX_STATUS, TRX_TYPE } from '../config/transactionConfig.js'
 import { emit } from '../helpers/walletControllerHelpers.js'
+import { MAX_WALLETS_PER_USER } from '../config/walletConfig.js'
 
 // --------------------
 // Create wallet
@@ -11,14 +12,41 @@ export const createWallet = async (req, res) => {
         const userId = req.user?._id
         const { currency } = req.body
 
-        if (!userId) return res.status(401).json({ message: 'Unauthorized' })
-        if (!currency) return res.status(400).json({ message: 'Currency is required' })
-
-        const exists = await Wallet.findOne({ userId, currency })
-        if (exists) {
-            return res.status(409).json({ message: `Wallet for ${currency} already exists` })
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' })
         }
 
+        if (!currency) {
+            return res.status(400).json({ message: 'Currency is required' })
+        }
+
+        // --------------------
+        // Wallet limit check
+        // --------------------
+        const MAX_WALLETS_PER_USER = 5
+
+        const walletCount = await Wallet.countDocuments({ userId })
+        if (walletCount >= MAX_WALLETS_PER_USER) {
+            return res.status(400).json({
+                code: 'WALLET_LIMIT_REACHED',
+                message: `You can only create up to ${MAX_WALLETS_PER_USER} wallets`,
+            })
+        }
+
+        // --------------------
+        // Duplicate currency check
+        // --------------------
+        const exists = await Wallet.findOne({ userId, currency })
+        if (exists) {
+            return res.status(409).json({
+                code: 'WALLET_ALREADY_EXISTS',
+                message: `Wallet for ${currency} already exists`,
+            })
+        }
+
+        // --------------------
+        // Create wallet
+        // --------------------
         const wallet = await Wallet.create({
             userId,
             currency,
@@ -28,12 +56,18 @@ export const createWallet = async (req, res) => {
 
         emit(userId, 'walletCreated', wallet)
 
-        return res.status(201).json({ message: 'Wallet created successfully', wallet })
+        return res.status(201).json({
+            message: 'Wallet created successfully',
+            wallet,
+        })
     } catch (err) {
         console.error(err)
-        return res.status(500).json({ message: 'Failed to create wallet' })
+        return res.status(500).json({
+            message: 'Failed to create wallet',
+        })
     }
 }
+
 
 // --------------------
 // Fund wallet

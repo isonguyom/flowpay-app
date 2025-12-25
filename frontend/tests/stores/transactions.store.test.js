@@ -87,12 +87,6 @@ describe('Transaction Store with limit', () => {
     it('adds a transaction', () => {
       const newTx = { _id: 'tx99', amount: 999 }
       store.addTransaction(newTx)
-      expect(store.transactions[store.transactions.length - 1]).toEqual(newTx)
-    })
-
-    it('prepends a transaction', () => {
-      const newTx = { _id: 'tx100', amount: 1000 }
-      store.prependTransaction(newTx)
       expect(store.transactions[0]).toEqual(newTx)
     })
 

@@ -1,168 +1,104 @@
 <script setup>
-import { onMounted, computed, ref, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import AppLayout from '@/layouts/AppLayout.vue'
-import ApiSkeleton from '@/components/ui/ApiSkeleton.vue'
-import ConfirmModal from '@/components/utilities/ConfirmModal.vue'
-import BaseInput from '@/components/utilities/BaseInput.vue'
-import BaseSelect from '@/components/utilities/BaseSelect.vue'
 import BaseButton from '@/components/utilities/BaseButton.vue'
 import BaseToast from '@/components/utilities/BaseToast.vue'
 
-import WalletCard from '@/components/cards/WalletCard.vue'
+import WalletList from '@/components/WalletList.vue'
 import TotalWalletBalanceCard from '@/components/cards/TotalWalletBalanceCard.vue'
 import FxChart from '@/components/charts/FxChart.vue'
 import TransactionsList from '@/components/TransactionsList.vue'
 
-import { useTransactionStore } from '@/stores/transactions'
+import FundWalletModal from '@/components/modals/FundWalletModal.vue'
+import WithdrawWalletModal from '@/components/modals/WithdrawWalletModal.vue'
+
 import { useWalletStore } from '@/stores/wallets'
+import { useTransactionStore } from '@/stores/transactions'
 import { useAuthStore } from '@/stores/auth'
-import { useFundingAccountsStore } from '@/stores/fundingAccounts'
 import { useUtils } from '@/composables/useUtils'
 
-// ------------------------
-// Stores & Utils
-// ------------------------
+// -------------------- Stores & Utils --------------------
 const walletStore = useWalletStore()
 const transactionStore = useTransactionStore()
 const authStore = useAuthStore()
-const fundingAccountsStore = useFundingAccountsStore()
-const { user } = storeToRefs(authStore)
 const { gotoRoute } = useUtils()
 
-// ------------------------
-// Constants
-// ------------------------
-const MIN_FUND_AMOUNT = 5
-const MIN_WITHDRAW_AMOUNT = 10
+const { user } = storeToRefs(authStore)
 
-// ------------------------
-// State
-// ------------------------
+// -------------------- State --------------------
 const showFundModal = ref(false)
 const showWithdrawModal = ref(false)
 const selectedWallet = ref(null)
-const submitting = ref(false)
-const toastRef = ref(null)
+
+const walletListRef = ref(null)
 const transactionsListRef = ref(null)
+const toastRef = ref(null)
 
-const fundForm = ref({ fundingAccount: '', amount: MIN_FUND_AMOUNT })
-const withdrawForm = ref({ recipient: '', amount: MIN_WITHDRAW_AMOUNT })
-const fundErrors = ref({})
-const withdrawErrors = ref({})
+// -------------------- Computed --------------------
+const totalBalance = computed(() => {
+    return walletListRef.value?.totalBalance ?? 0
+})
 
-// ------------------------
-// Computed
-// ------------------------
-const totalBalance = computed(() =>
-    walletStore.wallets.reduce((sum, w) => sum + (Number(w.balance) || 0), 0)
-)
-
-// ------------------------
-// Helpers
-// ------------------------
-const resetState = () => {
-    selectedWallet.value = null
-    fundErrors.value = {}
-    withdrawErrors.value = {}
-}
-
-// ------------------------
-// Validation
-// ------------------------
-const validateFundForm = () => {
-    fundErrors.value = {}
-    if (!fundForm.value.fundingAccount) fundErrors.value.fundingAccount = 'Funding account is required.'
-    if (!fundForm.value.amount || fundForm.value.amount < MIN_FUND_AMOUNT)
-        fundErrors.value.amount = `Minimum amount is ${MIN_FUND_AMOUNT}.`
-    return Object.keys(fundErrors.value).length === 0
-}
-
-const validateWithdrawForm = () => {
-    withdrawErrors.value = {}
-    if (!withdrawForm.value.recipient) withdrawErrors.value.recipient = 'Recipient is required.'
-    if (!withdrawForm.value.amount || withdrawForm.value.amount < MIN_WITHDRAW_AMOUNT)
-        withdrawErrors.value.amount = `Minimum amount is ${MIN_WITHDRAW_AMOUNT}.`
-    return Object.keys(withdrawErrors.value).length === 0
-}
-
-// Auto-clear errors
-watch(() => fundForm.value.fundingAccount, v => v && delete fundErrors.value.fundingAccount)
-watch(() => fundForm.value.amount, v => v >= MIN_FUND_AMOUNT && delete fundErrors.value.amount)
-watch(() => withdrawForm.value.recipient, v => v && delete withdrawErrors.value.recipient)
-watch(() => withdrawForm.value.amount, v => v >= MIN_WITHDRAW_AMOUNT && delete withdrawErrors.value.amount)
-
-// ------------------------
-// Modal Actions
-// ------------------------
-const openFundModal = wallet => {
+// -------------------- Modal Openers --------------------
+const openFundModal = (wallet) => {
+    if (!wallet?._id) return;  // don't open if invalid
     selectedWallet.value = wallet
-    fundForm.value = { fundingAccount: '', amount: MIN_FUND_AMOUNT }
-    fundErrors.value = {}
     showFundModal.value = true
 }
 
-const openWithdrawModal = wallet => {
+
+const openWithdrawModal = (wallet) => {
+    if (!wallet?._id) return;
     selectedWallet.value = wallet
-    withdrawForm.value = { recipient: '', amount: MIN_WITHDRAW_AMOUNT }
-    withdrawErrors.value = {}
     showWithdrawModal.value = true
 }
 
-// ------------------------
-// Submit Handlers
-// ------------------------
-const confirmFund = async () => {
-    if (!validateFundForm() || submitting.value) return
-    submitting.value = true
+// -------------------- Modal Closers --------------------
+const closeFundModal = () => {
+    showFundModal.value = false
+    selectedWallet.value = null
+}
+
+const closeWithdrawModal = () => {
+    showWithdrawModal.value = false
+    selectedWallet.value = null
+}
+
+// -------------------- Actions --------------------
+const confirmFundWallet = async (payload) => {
     try {
-        await walletStore.fundWallet(selectedWallet.value._id, Number(fundForm.value.amount))
-        await Promise.all([walletStore.fetchWallets(), transactionStore.fetchTransactions()])
+        await walletStore.fundWallet(payload)
         toastRef.value.addToast('Wallet funded successfully', 'success')
-        showFundModal.value = false
-        resetState()
+        closeFundModal()
     } catch (err) {
-        toastRef.value.addToast(walletStore.error || 'Failed to fund wallet', 'error')
-    } finally {
-        submitting.value = false
+        toastRef.value.addToast(
+            err.response?.data?.message || 'Funding failed',
+            'error'
+        )
     }
 }
 
-const confirmWithdraw = async () => {
-    if (!validateWithdrawForm() || submitting.value) return
-    const amount = Number(withdrawForm.value.amount)
-    const balance = Number(selectedWallet.value?.balance || 0)
-
-    if (amount > balance) {
-        withdrawErrors.value.amount = 'Insufficient balance'
-        toastRef.value.addToast(`Available balance: ${balance}`, 'error')
-        return
-    }
-
-    submitting.value = true
+const confirmWithdrawWallet = async (payload) => {
     try {
-        await walletStore.withdrawWallet(selectedWallet.value._id, amount, { beneficiary: withdrawForm.value.recipient })
-        await Promise.all([walletStore.fetchWallets(), transactionStore.fetchTransactions()])
+        await walletStore.withdrawWallet(payload)
         toastRef.value.addToast('Withdrawal successful', 'success')
-        showWithdrawModal.value = false
-        resetState()
+        closeWithdrawModal()
     } catch (err) {
-        toastRef.value.addToast(walletStore.error || 'Unable to process withdrawal', 'error')
-    } finally {
-        submitting.value = false
+        toastRef.value.addToast(
+            err.response?.data?.message || 'Withdrawal failed',
+            'error'
+        )
     }
 }
 
-// ------------------------
-// Lifecycle
-// ------------------------
+// -------------------- Lifecycle --------------------
 onMounted(async () => {
     await authStore.fetchMe()
     await Promise.all([
         walletStore.fetchWallets(),
         transactionStore.fetchTransactions(),
-        fundingAccountsStore.fetchFundingAccounts(),
     ])
 })
 </script>
@@ -172,8 +108,7 @@ onMounted(async () => {
         <div class="space-y-8">
 
             <!-- Total Balance -->
-            <TotalWalletBalanceCard :totalBalance="totalBalance" :defaultCurrency="user?.defaultCurrency"
-                @createWallet="gotoRoute('/wallets/create')" @makePayment="gotoRoute('/payment')" />
+            <TotalWalletBalanceCard :totalBalance="totalBalance" :defaultCurrency="user?.defaultCurrency" />
 
             <!-- Wallets -->
             <section>
@@ -181,26 +116,21 @@ onMounted(async () => {
                     Payment Wallets
                 </h3>
 
-                <ApiSkeleton :loading="walletStore.loading" :error="walletStore.error" :items="walletStore.wallets">
-                    <template #default="{ items }">
-                        <div class="flex gap-4 overflow-x-auto pb-2">
-                            <WalletCard v-for="wallet in items" :key="wallet._id" :wallet="wallet" @fund="openFundModal"
-                                @withdraw="openWithdrawModal" />
-                        </div>
-                    </template>
-                </ApiSkeleton>
+                <WalletList ref="walletListRef" @fund="openFundModal" @withdraw="openWithdrawModal" />
             </section>
 
+            <!-- FX Chart -->
             <FxChart />
 
-            <!-- Recent Transactions -->
+            <!-- Transactions -->
             <section>
                 <div class="flex justify-between mb-3">
-                    <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Transactions</h3>
+                    <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Recent Transactions
+                    </h3>
 
-                    <!-- Show "View all" only if total > maxItems -->
-                    <BaseButton v-if="transactionsListRef?.transactions.length && transactionsListRef?.total > 5"
-                        variant="ghost" size="sm" @click="gotoRoute('/transactions')">
+                    <BaseButton v-if="transactionsListRef?.total > 5" variant="ghost" size="sm"
+                        @click="gotoRoute('/transactions')">
                         View all
                     </BaseButton>
                 </div>
@@ -208,27 +138,12 @@ onMounted(async () => {
                 <TransactionsList ref="transactionsListRef" :max-items="7" />
             </section>
 
+            <!-- Modals -->
+            <FundWalletModal :show="showFundModal" :selected-wallet="selectedWallet" @close="closeFundModal"
+                @confirm="confirmFundWallet" />
 
-            <!-- Fund Modal -->
-            <ConfirmModal :show="showFundModal" title="Fund Wallet" :loading="submitting" @close="showFundModal = false"
-                @confirm="confirmFund">
-                <div class="space-y-4">
-                    <BaseSelect label="Funding Account" v-model="fundForm.fundingAccount"
-                        :options="fundingAccountsStore.accounts" :error="fundErrors.fundingAccount" />
-                    <BaseInput label="Amount" type="number" v-model="fundForm.amount" :min="MIN_FUND_AMOUNT" step="0.01"
-                        :error="fundErrors.amount" />
-                </div>
-            </ConfirmModal>
-
-            <!-- Withdraw Modal -->
-            <ConfirmModal :show="showWithdrawModal" title="Withdraw Funds" :loading="submitting"
-                @close="showWithdrawModal = false" @confirm="confirmWithdraw">
-                <div class="space-y-4">
-                    <BaseInput label="Recipient" v-model="withdrawForm.recipient" :error="withdrawErrors.recipient" />
-                    <BaseInput label="Amount" type="number" v-model="withdrawForm.amount" :min="MIN_WITHDRAW_AMOUNT"
-                        step="0.01" :error="withdrawErrors.amount" />
-                </div>
-            </ConfirmModal>
+            <WithdrawWalletModal :show="showWithdrawModal" :selected-wallet="selectedWallet" @close="closeWithdrawModal"
+                @confirm="confirmWithdrawWallet" />
 
             <BaseToast ref="toastRef" />
         </div>

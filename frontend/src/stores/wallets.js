@@ -69,22 +69,22 @@ export const useWalletStore = defineStore('wallets', () => {
   /**
    * Fund an existing wallet
    */
-  const fundWallet = async (walletId, amount) => updateWalletAmount(walletId, amount, '/wallets/fund')
+  const fundWallet = async (payload) => updateWalletAmount(payload, '/wallets/fund')
 
   /**
    * Withdraw from an existing wallet
    */
-  const withdrawWallet = async (walletId, amount) => updateWalletAmount(walletId, amount, '/wallets/withdraw')
+  const withdrawWallet = async (payload) => updateWalletAmount(payload, '/wallets/withdraw')
 
   /**
    * Helper to update wallet amount
    */
-  const updateWalletAmount = async (walletId, amount, endpoint) => {
+  const updateWalletAmount = async (payload, endpoint) => {
     loading.value = true
     error.value = null
 
     try {
-      const res = await api.post(endpoint, { walletId, amount })
+      const res = await api.post(endpoint, payload)
       const updatedWallet = res.data.wallet
       updateWallet(updatedWallet)
       return updatedWallet

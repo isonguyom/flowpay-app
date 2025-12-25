@@ -64,7 +64,7 @@ beforeEach(() => {
         error: '',
         hasMore: false,
         fetchTransactions: vi.fn(),
-        prependTransaction: vi.fn(),
+        addTransaction: vi.fn(),
         updateTransaction: vi.fn(),
     })
 
@@ -80,7 +80,7 @@ describe('TransactionsList', () => {
             error: '',
             hasMore: false,
             fetchTransactions: vi.fn(),
-            prependTransaction: vi.fn(),
+            addTransaction: vi.fn(),
             updateTransaction: vi.fn(),
         })
 
@@ -96,7 +96,7 @@ describe('TransactionsList', () => {
             error: '',
             hasMore: false,
             fetchTransactions: vi.fn(),
-            prependTransaction: vi.fn(),
+            addTransaction: vi.fn(),
             updateTransaction: vi.fn(),
         })
 
@@ -112,7 +112,7 @@ describe('TransactionsList', () => {
             error: '',
             hasMore: false,
             fetchTransactions: vi.fn(),
-            prependTransaction: vi.fn(),
+            addTransaction: vi.fn(),
             updateTransaction: vi.fn(),
         })
 
@@ -123,7 +123,7 @@ describe('TransactionsList', () => {
         expect(wrapper.findAll('[data-test="tx"]').length).toBe(2)
     })
 
-    it('prepends transaction on "transactionCreated" socket event', async () => {
+    it('adds transaction on "transactionCreated" socket event', async () => {
         const store = {
             transactions: [],
             total: 0,
@@ -131,7 +131,7 @@ describe('TransactionsList', () => {
             error: '',
             hasMore: false,
             fetchTransactions: vi.fn(),
-            prependTransaction: vi.fn(),
+            addTransaction: vi.fn(),
             updateTransaction: vi.fn(),
         }
 
@@ -149,7 +149,7 @@ describe('TransactionsList', () => {
         const handler = createdCall[1]
         handler({ id: 'new-tx' })
 
-        expect(store.prependTransaction).toHaveBeenCalledWith({ id: 'new-tx' })
+        expect(store.addTransaction).toHaveBeenCalledWith({ id: 'new-tx' })
     })
 
     it('updates transaction on "transactionUpdated" socket event', async () => {
@@ -160,7 +160,7 @@ describe('TransactionsList', () => {
             error: '',
             hasMore: false,
             fetchTransactions: vi.fn(),
-            prependTransaction: vi.fn(),
+            addTransaction: vi.fn(),
             updateTransaction: vi.fn(),
         }
 
@@ -189,7 +189,7 @@ describe('TransactionsList', () => {
             error: '',
             hasMore: false,
             fetchTransactions: vi.fn(),
-            prependTransaction: vi.fn(),
+            addTransaction: vi.fn(),
             updateTransaction: vi.fn(),
         }
 

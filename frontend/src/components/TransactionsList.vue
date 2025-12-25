@@ -21,7 +21,7 @@ let socketInitialized = false
 
 const handleTransactionCreated = (tx) => {
   if (!tx?.id) return
-  transactionStore.prependTransaction(tx)
+  transactionStore.addTransaction(tx)
 }
 
 const handleTransactionUpdated = (tx) => {
@@ -110,8 +110,8 @@ defineExpose({
 </script>
 
 <template>
-  <!-- Skeleton only for initial load -->
-  <ApiSkeleton v-if="props.showSkeleton && transactionStore.loading && !transactionStore.transactions.length"
+  <ApiSkeleton
+    v-if="props.showSkeleton && (!transactionStore.transactions.length || transactionStore.loading || transactionStore.error)"
     :loading="transactionStore.loading" :error="transactionStore.error" :items="visibleTransactions"
     empty="No transactions available">
     <template #default="{ items }">
@@ -119,8 +119,9 @@ defineExpose({
     </template>
   </ApiSkeleton>
 
-  <!-- Transactions Grid -->
-  <TransactionsGrid v-else :transactions="visibleTransactions" />
+  <!-- Only show TransactionsGrid if there are transactions -->
+  <TransactionsGrid v-else v-if="visibleTransactions.length" :transactions="visibleTransactions" />
+
 
   <!-- Sticky bottom loader (only for full-page infinite scroll) -->
   <div v-if="loadingMore" class="fixed bottom-4 left-0 w-full text-center">

@@ -19,15 +19,13 @@ const props = defineProps({
     }
 })
 
-// Emits
-const emit = defineEmits(['createWallet', 'makePayment'])
 
 // Stores
 const fxStore = useFxStore()
 const { fxList, feeRate, loading: fxLoading } = storeToRefs(fxStore)
 
 // Composables
-const { formatCurrencyCompact } = useUtils()
+const { formatCurrencyCompact, gotoRoute } = useUtils()
 
 const { convert } = useFx({
     feeRate,
@@ -37,10 +35,6 @@ const { convert } = useFx({
 // Visibility toggle
 const isVisible = ref(true)
 const toggleVisibility = () => (isVisible.value = !isVisible.value)
-
-// Handlers
-const handleCreateWallet = () => emit('createWallet')
-const handleMakePayment = () => emit('makePayment')
 
 // Computed
 const convertedUSD = computed(() => convert(props.totalBalance, props.defaultCurrency, 'USD', false).toFixed(2) || '0.00')
@@ -79,15 +73,15 @@ onMounted(async () => {
                         <span v-else>•••••</span>
                     </p>
                 </div>
-
-                <BaseButton @click="handleCreateWallet" size="sm" variant="ghost">
+                <!-- Create wallet Action -->
+                <BaseButton @click="gotoRoute('/wallets/create')" size="sm" variant="ghost">
                     <span class="text-xs md:text-sm">Create Wallet</span>
                 </BaseButton>
             </div>
 
-            <!-- Actions -->
+            <!-- Make Payment Action -->
             <div class="flex gap-3 flex-wrap">
-                <BaseButton @click="handleMakePayment" size="sm" variant="solid">
+                <BaseButton @click="gotoRoute('/payment')" size="sm" variant="solid">
                     <span class="text-xs md:text-sm">Make Payment</span>
                 </BaseButton>
             </div>

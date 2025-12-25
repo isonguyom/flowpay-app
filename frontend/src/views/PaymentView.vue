@@ -12,6 +12,7 @@ import BaseToast from '@/components/utilities/BaseToast.vue'
 
 import { useFxStore } from '@/stores/fx'
 import { usePaymentStore } from '@/stores/payment'
+import { useTransactionStore } from '@/stores/transactions'
 import { useWalletStore } from '@/stores/wallets'
 import { useUtils } from '@/composables/useUtils'
 import { useFx } from '@/composables/useFx'
@@ -22,6 +23,7 @@ import { useFx } from '@/composables/useFx'
 const fxStore = useFxStore()
 const walletStore = useWalletStore()
 const paymentStore = usePaymentStore()
+const transactionStore = useTransactionStore()
 
 const { fxList, feeRate, loading: fxLoading } = storeToRefs(fxStore)
 const { wallets, loading: walletsLoading } = storeToRefs(walletStore)
@@ -209,7 +211,6 @@ const makePayment = async () => {
             fxRate: fxRate.value,
             fee: fee.value
         })
-
 
         toastRef.value?.addToast('Payment submitted successfully', 'success')
         await new Promise(r => setTimeout(r, 800))

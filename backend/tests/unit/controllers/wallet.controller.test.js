@@ -17,18 +17,18 @@ describe('walletController', () => {
     req = { user: { _id: userId }, body: {} }
     res = { status: jest.fn().mockReturnThis(), json: jest.fn() }
 
-    mockWallet = { 
-      _id: new mongoose.Types.ObjectId(), 
-      balance: 100, 
-      currency: 'USD', 
-      status: 'Active', 
-      save: jest.fn().mockResolvedValue(true) 
+    mockWallet = {
+      _id: new mongoose.Types.ObjectId(),
+      balance: 100,
+      currency: 'USD',
+      status: 'Active',
+      save: jest.fn().mockResolvedValue(true)
     }
 
-    mockTransaction = { 
-      _id: new mongoose.Types.ObjectId(), 
-      status: TRX_STATUS.PENDING, 
-      save: jest.fn().mockResolvedValue(true) 
+    mockTransaction = {
+      _id: new mongoose.Types.ObjectId(),
+      status: TRX_STATUS.PENDING,
+      save: jest.fn().mockResolvedValue(true)
     }
 
     emit.mockClear()
@@ -50,14 +50,19 @@ describe('walletController', () => {
       expect(res.status).toHaveBeenCalledWith(400)
       expect(res.json).toHaveBeenCalledWith({ message: 'Currency is required' })
     })
-
     it('returns 409 if wallet already exists', async () => {
       req.body = { currency: 'USD' }
       Wallet.findOne.mockResolvedValue(mockWallet)
+
       await walletController.createWallet(req, res)
+
       expect(res.status).toHaveBeenCalledWith(409)
-      expect(res.json).toHaveBeenCalledWith({ message: 'Wallet for USD already exists' })
+      expect(res.json).toHaveBeenCalledWith({
+        code: 'WALLET_ALREADY_EXISTS',
+        message: 'Wallet for USD already exists'
+      })
     })
+
 
     it('creates wallet successfully', async () => {
       req.body = { currency: 'USD' }

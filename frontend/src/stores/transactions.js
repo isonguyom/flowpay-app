@@ -72,8 +72,8 @@ export const useTransactionStore = defineStore('transactions', () => {
     /**
      * Add or prepend a transaction (optimistic update)
      */
-    const addTransaction = (tx) => transactions.value.push(tx)
-    const prependTransaction = (tx) => transactions.value.unshift(tx)
+    const addTransaction = (tx) => transactions.value.unshift(tx)
+    // const prependTransaction = (tx) => transactions.value.unshift(tx)
 
     /**
      * Update a transaction by id
@@ -108,7 +108,6 @@ export const useTransactionStore = defineStore('transactions', () => {
         // actions
         fetchTransactions,
         addTransaction,
-        prependTransaction,
         updateTransaction,
         resetStore,
     }
