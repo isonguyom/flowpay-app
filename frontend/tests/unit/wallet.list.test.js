@@ -4,6 +4,15 @@ import { describe, it, beforeEach, expect, vi } from 'vitest'
 import WalletList from '@/components/WalletList.vue'
 import { useWalletStore } from '@/stores/wallets'
 
+import { vi } from 'vitest'
+
+globalThis.localStorage = {
+  getItem: vi.fn(() => null),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+
 // Stub WalletCard so tests don’t depend on router or FX store
 const WalletCardStub = {
     template: '<div><slot /></div>',

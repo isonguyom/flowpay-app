@@ -9,8 +9,16 @@ import { useAuthStore } from '@/stores/auth'
 // Mocks
 // ------------------------
 beforeAll(() => {
-    // jsdom doesn't implement scrollIntoView
-    Element.prototype.scrollIntoView = vi.fn()
+  Object.defineProperty(window, 'localStorage', {
+    value: {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    },
+  })
+
+  Element.prototype.scrollIntoView = vi.fn()
 })
 
 // Dummy pages for router

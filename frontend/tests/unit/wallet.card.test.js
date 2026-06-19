@@ -6,91 +6,121 @@ import WalletCard from '@/components/cards/WalletCard.vue'
 
 // -------------------- Mock composables --------------------
 vi.mock('@/composables/useFx', () => ({
-    useFx: () => ({
-        convert: vi.fn((amount) => amount), // simple identity function
-    }),
+  useFx: () => ({
+    convert: vi.fn((amount) => amount), // simple identity function
+  }),
 }))
 
 vi.mock('@/composables/useUtils', () => ({
-    useUtils: () => ({
-        formatCurrencyCompact: (amount) => `$${amount.toFixed(2)}`,
-    }),
+  useUtils: () => ({
+    formatCurrencyCompact: (amount) => `$${amount.toFixed(2)}`,
+  }),
 }))
 
 // -------------------- Mock fxStore --------------------
 vi.mock('@/stores/fx', () => ({
-    useFxStore: () => ({
-        fxList: ref([{ value: 'USD' }]),
-        feeRate: ref(0),
-        loading: ref(false),
-        fetchFx: vi.fn(),
-    }),
+  useFxStore: () => ({
+    fxList: ref([{ value: 'USD' }]),
+    feeRate: ref(0),
+    loading: ref(false),
+    fetchFx: vi.fn(),
+  }),
 }))
 
 // -------------------- Mock wallet --------------------
 const mockWallet = {
-    currency: 'USD',
-    balance: 1234.56,
-    color: '#00FF00',
+  currency: 'USD',
+  balance: 1234.56,
+  color: '#00FF00',
+}
+
+const BaseButtonStub = {
+  template: `<button @click="$emit('click')"><slot /></button>`,
 }
 
 describe('WalletCard.vue', () => {
-    beforeEach(() => {
-        const pinia = createPinia()
-        setActivePinia(pinia)
+  beforeEach(() => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+  })
+
+  it('renders wallet currency and balance', () => {
+    const wrapper = mount(WalletCard, {
+      props: { wallet: mockWallet },
+      global: {
+        stubs: {
+          BaseButton: BaseButtonStub,
+        },
+      },
     })
+    expect(wrapper.text()).toContain('USD Wallet')
+    expect(wrapper.text()).toContain('$1234.56')
+  })
 
-    it('renders wallet currency and balance', () => {
-        const wrapper = mount(WalletCard, { props: { wallet: mockWallet } })
-        expect(wrapper.text()).toContain('USD Wallet')
-        expect(wrapper.text()).toContain('$1234.56')
+  it('toggles visibility of balance', async () => {
+    const wrapper = mount(WalletCard, {
+      props: { wallet: mockWallet },
+      global: {
+        stubs: {
+          BaseButton: BaseButtonStub,
+        },
+      },
     })
+    const toggleButton = wrapper.find('button')
 
-    it('toggles visibility of balance', async () => {
-        const wrapper = mount(WalletCard, { props: { wallet: mockWallet } })
-        const toggleButton = wrapper.find('button')
+    // Initially visible
+    expect(wrapper.text()).toContain('$1234.56')
 
-        // Initially visible
-        expect(wrapper.text()).toContain('$1234.56')
+    // Hide balance
+    await toggleButton.trigger('click')
+    expect(wrapper.text()).toContain('•••••')
 
-        // Hide balance
-        await toggleButton.trigger('click')
-        expect(wrapper.text()).toContain('•••••')
+    // Show balance again
+    await toggleButton.trigger('click')
+    expect(wrapper.text()).toContain('$1234.56')
+  })
 
-        // Show balance again
-        await toggleButton.trigger('click')
-        expect(wrapper.text()).toContain('$1234.56')
+  // it('emits fund and withdraw events correctly', async () => {
+  //     const wrapper = mount(WalletCard, { props: { wallet: mockWallet } })
+  //     const buttons = wrapper.findAll('button')
+
+  //     // Fund button (second button in template)
+  //     await buttons[1].trigger('click')
+  //     expect(wrapper.emitted('fund')).toBeTruthy()
+  //     expect(wrapper.emitted('fund')[0]).toEqual([mockWallet])
+
+  //     // Withdraw button (third button in template)
+  //     await buttons[2].trigger('click')
+  //     expect(wrapper.emitted('withdraw')).toBeTruthy()
+  //     expect(wrapper.emitted('withdraw')[0]).toEqual([mockWallet])
+  // })
+  it('emits fund events correctly', async () => {
+    const wrapper = mount(WalletCard, {
+      props: { wallet: mockWallet },
+      global: {
+        stubs: {
+          BaseButton: BaseButtonStub,
+        },
+      },
     })
+    const button = wrapper.find('button')
 
-    // it('emits fund and withdraw events correctly', async () => {
-    //     const wrapper = mount(WalletCard, { props: { wallet: mockWallet } })
-    //     const buttons = wrapper.findAll('button')
+    // Fund button (second button in template)
+    const buttons = wrapper.findAll('button')
 
-    //     // Fund button (second button in template)
-    //     await buttons[1].trigger('click')
-    //     expect(wrapper.emitted('fund')).toBeTruthy()
-    //     expect(wrapper.emitted('fund')[0]).toEqual([mockWallet])
+    // Fund button is first BaseButton
+    await buttons[1].trigger('click')
 
-    //     // Withdraw button (third button in template)
-    //     await buttons[2].trigger('click')
-    //     expect(wrapper.emitted('withdraw')).toBeTruthy()
-    //     expect(wrapper.emitted('withdraw')[0]).toEqual([mockWallet])
-    // })
-    it('emits fund events correctly', async () => {
-        const wrapper = mount(WalletCard, { props: { wallet: mockWallet } })
-        const button = wrapper.find('button')
+    expect(wrapper.emitted('fund')).toBeTruthy()
+    expect(wrapper.emitted('fund')).toBeTruthy()
+    expect(wrapper.emitted('fund')[0]).toEqual([mockWallet])
+  })
 
-        // Fund button (second button in template)
-        await button.trigger('click')
-        expect(wrapper.emitted('fund')).toBeTruthy()
-        expect(wrapper.emitted('fund')[0]).toEqual([mockWallet])
-    })
+  it('displays converted USD balance correctly', () => {
+    const wrapper = mount(WalletCard, { props: { wallet: mockWallet } })
+    const usdSpan = wrapper.find('p span')
 
-    it('displays converted USD balance correctly', () => {
-        const wrapper = mount(WalletCard, { props: { wallet: mockWallet } })
-        const usdSpan = wrapper.find('p span')
-
-        // Remove spaces in the string to match expected format
-        expect(usdSpan.text().replace(/\s/g, '')).toBe('1234.56')
-    })
+    // Remove spaces in the string to match expected format
+    expect(usdSpan.text().replace(/\s/g, '')).toBe('1234.56')
+  })
 })
