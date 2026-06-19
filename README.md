@@ -44,7 +44,7 @@ The system supports:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/flowpay.git
+git clone https://github.com/isonguyom/flowpay.git
 cd flowpay
 ```
 
